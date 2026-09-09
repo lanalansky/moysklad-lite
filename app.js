@@ -3,14 +3,25 @@ const state = { products: [], contacts: [], orders: [], inventories: [] };
 const statusEl = document.getElementById('status');
 
 async function api(action, payload) {
-  const res = await fetch(CONFIG.API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action, payload: payload || {} })
-  });
-  const json = await res.json();
-  if (!json.ok) throw new Error(json.error || 'Unknown API error');
-  return json.data;
+  const maxAttempts = 3;
+  let lastErr;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const res = await fetch(CONFIG.API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action, payload: payload || {} })
+      });
+      const text = await res.text();
+      const json = JSON.parse(text);
+      if (!json.ok) throw new Error(json.error || 'Unknown API error');
+      return json.data;
+    } catch (err) {
+      lastErr = err;
+      if (attempt < maxAttempts) await new Promise(r => setTimeout(r, 800 * attempt));
+    }
+  }
+  throw lastErr;
 }
 
 function setStatus(text, isError) {

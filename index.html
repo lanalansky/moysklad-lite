@@ -46,11 +46,11 @@
 
   <section id="tab-orders" class="tab-panel">
     <div class="panel-head">
-      <h2>Заказы</h2>
+      <h2>Заказы поставщикам</h2>
       <button class="btn primary" id="addOrderBtn">+ Новый заказ</button>
     </div>
     <table class="data-table">
-      <thead><tr><th>Дата</th><th>Контрагент</th><th>Тип</th><th>Статус</th><th>Сумма</th><th></th></tr></thead>
+      <thead><tr><th>Дата</th><th>Поставщик</th><th>Статус</th><th>Сумма</th><th></th></tr></thead>
       <tbody id="ordersBody"></tbody>
     </table>
   </section>
@@ -225,23 +225,22 @@
 <!-- Order modal -->
 <div class="modal" id="orderModal">
   <div class="modal-content wide">
-    <h3>Новый заказ</h3>
-    <label>Контрагент
+    <h3>Новый заказ поставщику</h3>
+    <label>Поставщик
       <select id="orderContact"></select>
-    </label>
-    <label>Тип
-      <select id="orderType">
-        <option value="sale">Продажа (списание со склада)</option>
-        <option value="purchase">Закупка (приход на склад)</option>
-      </select>
     </label>
     <h4>Позиции</h4>
     <table class="data-table" id="orderItemsTable">
-      <thead><tr><th>Товар</th><th>Кол-во</th><th>Цена</th><th>Сумма</th><th></th></tr></thead>
+      <thead><tr><th>Товар</th><th>Кол-во</th><th>Закуп. цена</th><th>Сумма</th><th></th></tr></thead>
       <tbody id="orderItemsBody"></tbody>
     </table>
     <button class="btn" id="addOrderItemBtn">+ Добавить позицию</button>
-    <div class="order-total">Итого: <span id="orderTotal">0</span></div>
+    <label class="delivery-field">Расходы на доставку (на весь заказ)<input type="number" id="orderDelivery" step="0.01" value="0"></label>
+    <div class="order-totals">
+      <div><span>Товары</span><span id="orderSubtotal">0</span></div>
+      <div><span>Доставка</span><span id="orderDeliveryTotal">0</span></div>
+      <div class="final"><span>Итого</span><span id="orderTotal">0</span></div>
+    </div>
     <div class="modal-actions">
       <button class="btn" data-close="orderModal">Отмена</button>
       <button class="btn primary" id="saveOrderBtn">Создать заказ</button>

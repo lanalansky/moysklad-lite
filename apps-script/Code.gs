@@ -3,7 +3,7 @@
 
 var PRODUCTS_HEADERS = ['ID', 'Name', 'Group', 'Article', 'Code', 'Unit', 'MinPrice', 'CostPrice', 'Price', 'Quantity', 'Weight', 'Volume'];
 var CONTACTS_HEADERS = ['ID', 'Name', 'Type', 'Phone', 'Email', 'Address'];
-var ORDERS_HEADERS = ['ID', 'Date', 'ContactID', 'ContactName', 'Type', 'Status', 'ItemsJSON', 'Total'];
+var ORDERS_HEADERS = ['ID', 'Date', 'ContactID', 'ContactName', 'Type', 'Status', 'ItemsJSON', 'Delivery', 'Total'];
 var MOVEMENTS_HEADERS = ['ID', 'Date', 'ProductId', 'ProductName', 'Delta', 'Type', 'RefId', 'RefLabel'];
 var INVENTORIES_HEADERS = ['ID', 'Date', 'Comment', 'Status', 'ItemsJSON'];
 
@@ -315,14 +315,39 @@ function applyStockDelta(items, sign, type, refId, refLabel) {
   var sheet = productsSheet();
   var qtyCol = PRODUCTS_HEADERS.indexOf('Quantity') + 1;
   var nameCol = PRODUCTS_HEADERS.indexOf('Name') + 1;
+  var costCol = PRODUCTS_HEADERS.indexOf('CostPrice') + 1;
   items.forEach(function (item) {
     var row = findRowById(sheet, item.productId);
     if (row === -1) return;
     var qtyCell = sheet.getRange(row, qtyCol);
+    var oldQty = Number(qtyCell.getValue());
     var delta = (type === 'purchase' ? 1 : -1) * sign * Number(item.qty);
-    qtyCell.setValue(Number(qtyCell.getValue()) + delta);
+    if (type === 'purchase' && sign === 1) {
+      var costCell = sheet.getRange(row, costCol);
+      var oldCost = Number(costCell.getValue());
+      var purchaseQty = Number(item.qty);
+      var purchasePrice = Number(item.landedPrice !== undefined ? item.landedPrice : item.price);
+      var newQtyTotal = oldQty + purchaseQty;
+      var newCost = newQtyTotal > 0 ? ((oldQty * oldCost) + (purchaseQty * purchasePrice)) / newQtyTotal : purchasePrice;
+      costCell.setValue(newCost);
+    }
+    qtyCell.setValue(oldQty + delta);
     var productName = sheet.getRange(row, nameCol).getValue();
     logMovement(item.productId, productName, delta, type === 'purchase' ? 'purchase' : 'sale', refId, refLabel);
+  });
+}
+
+// Distributes the order's total delivery cost across items proportionally to
+// each line's share of the goods subtotal, so landed cost reflects true cost per unit.
+function computeLandedItems(items, delivery) {
+  var subtotal = items.reduce(function (sum, i) { return sum + Number(i.qty) * Number(i.price); }, 0);
+  var deliveryTotal = Number(delivery) || 0;
+  return items.map(function (i) {
+    var qty = Number(i.qty), price = Number(i.price);
+    var lineSum = qty * price;
+    var share = subtotal > 0 ? (lineSum / subtotal) * deliveryTotal : (items.length ? deliveryTotal / items.length : 0);
+    var landed = qty > 0 ? price + (share / qty) : price;
+    return { productId: i.productId, qty: qty, price: price, landedPrice: landed };
   });
 }
 
@@ -333,11 +358,13 @@ function addOrder(o) {
     var contacts = sheetToObjects(contactsSheet(), CONTACTS_HEADERS);
     contact = contacts.filter(function (c) { return String(c.ID) === String(o.contactId); })[0];
   }
-  var items = o.items || [];
-  var total = items.reduce(function (sum, i) { return sum + Number(i.qty) * Number(i.price); }, 0);
+  var delivery = Number(o.delivery) || 0;
+  var subtotal = (o.items || []).reduce(function (sum, i) { return sum + Number(i.qty) * Number(i.price); }, 0);
+  var items = computeLandedItems(o.items || [], delivery);
   var obj = {
     ID: newId(), Date: new Date(), ContactID: o.contactId || '', ContactName: contact ? contact.Name : '',
-    Type: o.type || 'sale', Status: o.status || 'completed', ItemsJSON: JSON.stringify(items), Total: total
+    Type: o.type || 'purchase', Status: o.status || 'completed', ItemsJSON: JSON.stringify(items),
+    Delivery: delivery, Total: subtotal + delivery
   };
   sheet.appendRow(ORDERS_HEADERS.map(function (h) { return obj[h]; }));
   var refLabel = (obj.Type === 'purchase' ? 'Закупка' : 'Продажа') + (contact ? ' — ' + contact.Name : '');

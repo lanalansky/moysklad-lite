@@ -209,16 +209,13 @@ document.getElementById('saveContactBtn').addEventListener('click', async () => 
   await loadAll();
 });
 
-// ---- Orders ----
-const orderTypeLabels = { sale: 'Продажа', purchase: 'Закупка' };
-
+// ---- Orders (заказы поставщикам) ----
 function renderOrders() {
   const body = document.getElementById('ordersBody');
   body.innerHTML = state.orders.slice().reverse().map(o => `
     <tr>
       <td>${formatDate(o.Date)}</td>
       <td>${escapeHtml(o.ContactName)}</td>
-      <td>${orderTypeLabels[o.Type] || o.Type}</td>
       <td>${escapeHtml(o.Status)}</td>
       <td>${formatMoney(o.Total)}</td>
       <td class="actions">
@@ -239,15 +236,15 @@ document.getElementById('ordersBody').addEventListener('click', async (e) => {
 
 document.getElementById('addOrderBtn').addEventListener('click', () => {
   document.getElementById('orderItemsBody').innerHTML = '';
-  document.getElementById('orderType').value = 'sale';
-  updateOrderTotal();
+  document.getElementById('orderDelivery').value = 0;
   addOrderItemRow();
+  updateOrderTotal();
   openModal('orderModal');
 });
 
 function addOrderItemRow() {
   const row = document.createElement('tr');
-  const options = state.products.map(p => `<option value="${p.ID}" data-price="${p.Price}">${escapeHtml(p.Name)}</option>`).join('');
+  const options = state.products.map(p => `<option value="${p.ID}" data-cost="${p.CostPrice}">${escapeHtml(p.Name)}</option>`).join('');
   row.innerHTML = `
     <td><select class="item-product">${options}</select></td>
     <td><input type="number" class="item-qty" value="1" min="0.01" step="0.01"></td>
@@ -260,7 +257,7 @@ function addOrderItemRow() {
   const priceInput = row.querySelector('.item-price');
   const setPriceFromProduct = () => {
     const opt = productSelect.options[productSelect.selectedIndex];
-    priceInput.value = opt ? opt.dataset.price : 0;
+    priceInput.value = opt ? opt.dataset.cost : 0;
     updateRowSum(row);
   };
   productSelect.addEventListener('change', setPriceFromProduct);
@@ -279,16 +276,20 @@ function updateRowSum(row) {
 
 function updateOrderTotal() {
   const rows = document.querySelectorAll('#orderItemsBody tr');
-  let total = 0;
+  let subtotal = 0;
   rows.forEach(row => {
     const qty = Number(row.querySelector('.item-qty')?.value) || 0;
     const price = Number(row.querySelector('.item-price')?.value) || 0;
-    total += qty * price;
+    subtotal += qty * price;
   });
-  document.getElementById('orderTotal').textContent = formatMoney(total);
+  const delivery = Number(document.getElementById('orderDelivery').value) || 0;
+  document.getElementById('orderSubtotal').textContent = formatMoney(subtotal);
+  document.getElementById('orderDeliveryTotal').textContent = formatMoney(delivery);
+  document.getElementById('orderTotal').textContent = formatMoney(subtotal + delivery);
 }
 
 document.getElementById('addOrderItemBtn').addEventListener('click', addOrderItemRow);
+document.getElementById('orderDelivery').addEventListener('input', updateOrderTotal);
 
 document.getElementById('saveOrderBtn').addEventListener('click', async () => {
   const rows = document.querySelectorAll('#orderItemsBody tr');
@@ -300,7 +301,8 @@ document.getElementById('saveOrderBtn').addEventListener('click', async () => {
   if (items.length === 0) { alert('Добавьте хотя бы одну позицию'); return; }
   const payload = {
     contactId: document.getElementById('orderContact').value,
-    type: document.getElementById('orderType').value,
+    type: 'purchase',
+    delivery: Number(document.getElementById('orderDelivery').value) || 0,
     items
   };
   await api('addOrder', payload);

@@ -198,6 +198,25 @@ main { padding: 24px; }
   margin: 12px 0;
 }
 
+.delivery-field { margin-top: 16px; }
+
+.order-totals { margin-top: 12px; }
+.order-totals > div {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+.order-totals > div.final {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  margin-top: 4px;
+}
+
 #orderItemsBody select, #orderItemsBody input {
   width: 100%;
   padding: 6px 8px;

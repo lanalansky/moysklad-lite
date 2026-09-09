@@ -87,6 +87,7 @@ main { padding: 24px; }
 
 .btn.primary:hover { background: var(--primary-dark); }
 .btn.danger { color: var(--danger); border-color: var(--danger); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
 
 .data-table {
   width: 100%;

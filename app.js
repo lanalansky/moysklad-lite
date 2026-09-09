@@ -18,8 +18,14 @@ function setStatus(text, isError) {
   statusEl.className = 'status' + (isError ? ' error' : '');
 }
 
+const createButtonIds = ['addProductBtn', 'addContactBtn', 'addOrderBtn'];
+function setCreateButtonsEnabled(enabled) {
+  createButtonIds.forEach(id => { document.getElementById(id).disabled = !enabled; });
+}
+
 async function loadAll() {
   setStatus('Загрузка...');
+  setCreateButtonsEnabled(false);
   try {
     const data = await api('getAll');
     state.products = data.products;
@@ -34,6 +40,8 @@ async function loadAll() {
     setStatus('Обновлено: ' + new Date().toLocaleTimeString());
   } catch (err) {
     setStatus('Ошибка: ' + err.message, true);
+  } finally {
+    setCreateButtonsEnabled(true);
   }
 }
 

@@ -274,9 +274,9 @@ function addOrderItemRow() {
     const q = query.trim().toLowerCase();
     if (!q) { suggestBox.hidden = true; return; }
     const matches = state.products.filter(p =>
-      p.Name.toLowerCase().includes(q) ||
-      (p.Code || '').toLowerCase().includes(q) ||
-      (p.Article || '').toLowerCase().includes(q)
+      String(p.Name || '').toLowerCase().includes(q) ||
+      String(p.Code || '').toLowerCase().includes(q) ||
+      String(p.Article || '').toLowerCase().includes(q)
     ).slice(0, 10);
     if (!matches.length) {
       suggestBox.innerHTML = '<div class="picker-suggestion" style="color:var(--muted);">Не найдено</div>';
@@ -388,7 +388,7 @@ function initPicker(prefix, onAdd, onRemove) {
       .map(g => ({ type: 'group', id: g, label: g }));
     const products = state.products
       .filter(p => !selected.some(s => s.type === 'product' && s.id === p.ID))
-      .filter(p => !q || p.Name.toLowerCase().includes(q) || (p.Code || '').toLowerCase().includes(q) || (p.Article || '').toLowerCase().includes(q))
+      .filter(p => !q || String(p.Name || '').toLowerCase().includes(q) || String(p.Code || '').toLowerCase().includes(q) || String(p.Article || '').toLowerCase().includes(q))
       .slice(0, 8)
       .map(p => ({ type: 'product', id: p.ID, label: p.Name }));
     const items = groups.concat(products);

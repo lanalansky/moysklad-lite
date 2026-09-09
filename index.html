@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MoySkladLite</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <h1>MoySkladLite</h1>
+  <div class="status" id="status"></div>
+</header>
+
+<nav class="tabs">
+  <button class="tab-btn active" data-tab="products">Товары</button>
+  <button class="tab-btn" data-tab="contacts">Контрагенты</button>
+  <button class="tab-btn" data-tab="orders">Заказы</button>
+</nav>
+
+<main>
+  <section id="tab-products" class="tab-panel active">
+    <div class="panel-head">
+      <h2>Товары и остатки</h2>
+      <button class="btn primary" id="addProductBtn">+ Добавить товар</button>
+    </div>
+    <table class="data-table">
+      <thead><tr><th>Название</th><th>Артикул</th><th>Категория</th><th>Ед.</th><th>Цена</th><th>Остаток</th><th></th></tr></thead>
+      <tbody id="productsBody"></tbody>
+    </table>
+  </section>
+
+  <section id="tab-contacts" class="tab-panel">
+    <div class="panel-head">
+      <h2>Контрагенты</h2>
+      <button class="btn primary" id="addContactBtn">+ Добавить контрагента</button>
+    </div>
+    <table class="data-table">
+      <thead><tr><th>Имя</th><th>Тип</th><th>Телефон</th><th>Email</th><th>Адрес</th><th></th></tr></thead>
+      <tbody id="contactsBody"></tbody>
+    </table>
+  </section>
+
+  <section id="tab-orders" class="tab-panel">
+    <div class="panel-head">
+      <h2>Заказы</h2>
+      <button class="btn primary" id="addOrderBtn">+ Новый заказ</button>
+    </div>
+    <table class="data-table">
+      <thead><tr><th>Дата</th><th>Контрагент</th><th>Тип</th><th>Статус</th><th>Сумма</th><th></th></tr></thead>
+      <tbody id="ordersBody"></tbody>
+    </table>
+  </section>
+</main>
+
+<!-- Product modal -->
+<div class="modal" id="productModal">
+  <div class="modal-content">
+    <h3 id="productModalTitle">Товар</h3>
+    <input type="hidden" id="productId">
+    <label>Название<input type="text" id="productName" required></label>
+    <label>Артикул (SKU)<input type="text" id="productSku"></label>
+    <label>Категория<input type="text" id="productCategory"></label>
+    <label>Единица измерения<input type="text" id="productUnit" value="шт"></label>
+    <label>Цена<input type="number" id="productPrice" step="0.01" value="0"></label>
+    <label>Остаток<input type="number" id="productQuantity" step="1" value="0"></label>
+    <div class="modal-actions">
+      <button class="btn" data-close="productModal">Отмена</button>
+      <button class="btn primary" id="saveProductBtn">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Contact modal -->
+<div class="modal" id="contactModal">
+  <div class="modal-content">
+    <h3 id="contactModalTitle">Контрагент</h3>
+    <input type="hidden" id="contactId">
+    <label>Имя / Название<input type="text" id="contactName" required></label>
+    <label>Тип
+      <select id="contactType">
+        <option value="client">Клиент</option>
+        <option value="supplier">Поставщик</option>
+      </select>
+    </label>
+    <label>Телефон<input type="text" id="contactPhone"></label>
+    <label>Email<input type="text" id="contactEmail"></label>
+    <label>Адрес<input type="text" id="contactAddress"></label>
+    <div class="modal-actions">
+      <button class="btn" data-close="contactModal">Отмена</button>
+      <button class="btn primary" id="saveContactBtn">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<!-- Order modal -->
+<div class="modal" id="orderModal">
+  <div class="modal-content wide">
+    <h3>Новый заказ</h3>
+    <label>Контрагент
+      <select id="orderContact"></select>
+    </label>
+    <label>Тип
+      <select id="orderType">
+        <option value="sale">Продажа (списание со склада)</option>
+        <option value="purchase">Закупка (приход на склад)</option>
+      </select>
+    </label>
+    <h4>Позиции</h4>
+    <table class="data-table" id="orderItemsTable">
+      <thead><tr><th>Товар</th><th>Кол-во</th><th>Цена</th><th>Сумма</th><th></th></tr></thead>
+      <tbody id="orderItemsBody"></tbody>
+    </table>
+    <button class="btn" id="addOrderItemBtn">+ Добавить позицию</button>
+    <div class="order-total">Итого: <span id="orderTotal">0</span></div>
+    <div class="modal-actions">
+      <button class="btn" data-close="orderModal">Отмена</button>
+      <button class="btn primary" id="saveOrderBtn">Создать заказ</button>
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

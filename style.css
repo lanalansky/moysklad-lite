@@ -225,8 +225,8 @@ main { padding: 24px; }
   border-radius: 6px;
 }
 
-.item-product-cell { position: relative; min-width: 240px; }
-.item-product-suggestions { max-height: 240px; overflow-y: auto; }
+.item-product-cell { min-width: 240px; }
+.picker-suggestions.item-product-suggestions { max-height: 240px; overflow-y: auto; z-index: 1000; }
 
 /* ---- Warehouse (Склад) ---- */
 .subtabs {

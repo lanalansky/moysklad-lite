@@ -254,6 +254,7 @@ document.getElementById('ordersBody').addEventListener('click', async (e) => {
 });
 
 document.getElementById('addOrderBtn').addEventListener('click', () => {
+  document.querySelectorAll('.item-product-suggestions').forEach(el => el.remove());
   document.getElementById('orderItemsBody').innerHTML = '';
   document.getElementById('orderDelivery').value = 0;
   addOrderItemRow();
@@ -267,7 +268,6 @@ function addOrderItemRow() {
     <td class="item-product-cell">
       <input type="hidden" class="item-product-id">
       <input type="text" class="item-product-search" placeholder="Название, код или артикул…" autocomplete="off">
-      <div class="picker-suggestions item-product-suggestions" hidden></div>
     </td>
     <td><input type="number" class="item-qty" value="1" min="0.01" step="0.01"></td>
     <td><input type="number" class="item-price" value="0" min="0" step="0.01"></td>
@@ -278,12 +278,27 @@ function addOrderItemRow() {
 
   const idInput = row.querySelector('.item-product-id');
   const searchInput = row.querySelector('.item-product-search');
-  const suggestBox = row.querySelector('.item-product-suggestions');
   const priceInput = row.querySelector('.item-price');
+
+  // Rendered on <body>, not inside the table, so it can't get clipped or
+  // painted under later siblings by the table's own stacking context.
+  const suggestBox = document.createElement('div');
+  suggestBox.className = 'picker-suggestions item-product-suggestions';
+  suggestBox.hidden = true;
+  document.body.appendChild(suggestBox);
+
+  function positionSuggestBox() {
+    const rect = searchInput.getBoundingClientRect();
+    suggestBox.style.position = 'fixed';
+    suggestBox.style.top = (rect.bottom + 4) + 'px';
+    suggestBox.style.left = rect.left + 'px';
+    suggestBox.style.width = rect.width + 'px';
+  }
 
   function showProductSuggestions(query) {
     const q = query.trim().toLowerCase();
     if (!q) { suggestBox.hidden = true; return; }
+    positionSuggestBox();
     const matches = state.products.filter(p =>
       String(p.Name || '').toLowerCase().includes(q) ||
       String(p.Code || '').toLowerCase().includes(q) ||
@@ -316,12 +331,16 @@ function addOrderItemRow() {
   searchInput.addEventListener('input', () => showProductSuggestions(searchInput.value));
   searchInput.addEventListener('focus', () => { if (searchInput.value) showProductSuggestions(searchInput.value); });
   document.addEventListener('click', (e) => {
-    if (!row.contains(e.target)) suggestBox.hidden = true;
+    if (!row.contains(e.target) && !suggestBox.contains(e.target)) suggestBox.hidden = true;
   });
 
   row.querySelector('.item-qty').addEventListener('input', () => updateRowSum(row));
   priceInput.addEventListener('input', () => updateRowSum(row));
-  row.querySelector('[data-remove-item]').addEventListener('click', () => { row.remove(); updateOrderTotal(); });
+  row.querySelector('[data-remove-item]').addEventListener('click', () => {
+    row.remove();
+    suggestBox.remove();
+    updateOrderTotal();
+  });
 }
 
 function updateRowSum(row) {

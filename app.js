@@ -29,6 +29,22 @@ function setStatus(text, isError) {
   statusEl.className = 'status' + (isError ? ' error' : '');
 }
 
+// Disables the button for the duration of the handler so a fast double/triple
+// click (or an impatient re-click while a request is in flight) can't submit
+// the same document more than once.
+function guardClick(id, handler) {
+  const btn = document.getElementById(id);
+  btn.addEventListener('click', async (e) => {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    try {
+      await handler(e);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
+
 const createButtonIds = ['addProductBtn', 'addContactBtn', 'addOrderBtn', 'addSaleBtn'];
 function setCreateButtonsEnabled(enabled) {
   createButtonIds.forEach(id => { document.getElementById(id).disabled = !enabled; });
@@ -141,7 +157,7 @@ document.getElementById('productsBody').addEventListener('click', async (e) => {
   }
 });
 
-document.getElementById('saveProductBtn').addEventListener('click', async () => {
+guardClick('saveProductBtn', async () => {
   const id = document.getElementById('productId').value;
   const costPriceInput = document.getElementById('productCostPrice');
   const payload = {
@@ -216,7 +232,7 @@ document.getElementById('contactsBody').addEventListener('click', async (e) => {
   }
 });
 
-document.getElementById('saveContactBtn').addEventListener('click', async () => {
+guardClick('saveContactBtn', async () => {
   const id = document.getElementById('contactId').value;
   const payload = {
     id,
@@ -378,7 +394,7 @@ function updateOrderTotal() {
 document.getElementById('addOrderItemBtn').addEventListener('click', addOrderItemRow);
 document.getElementById('orderDelivery').addEventListener('input', updateOrderTotal);
 
-document.getElementById('saveOrderBtn').addEventListener('click', async () => {
+guardClick('saveOrderBtn', async () => {
   const rows = document.querySelectorAll('#orderItemsBody tr');
   const items = Array.from(rows).map(row => ({
     productId: row.querySelector('.item-product-id').value,
@@ -637,8 +653,8 @@ async function saveInventory(status) {
   await loadAll();
 }
 
-document.getElementById('inventoryDraftBtn').addEventListener('click', () => saveInventory('draft'));
-document.getElementById('inventoryFinalizeBtn').addEventListener('click', () => saveInventory('done'));
+guardClick('inventoryDraftBtn', () => saveInventory('draft'));
+guardClick('inventoryFinalizeBtn', () => saveInventory('done'));
 
 function renderInventories() {
   const body = document.getElementById('inventoriesBody');
@@ -767,7 +783,7 @@ document.getElementById('addSaleBtn').addEventListener('click', () => {
   openModal('saleModal');
 });
 
-document.getElementById('saveSaleBtn').addEventListener('click', async () => {
+guardClick('saveSaleBtn', async () => {
   const rows = document.querySelectorAll('#saleItemsBody tr');
   const items = Array.from(rows).map(row => {
     const productId = row.querySelector('.item-product-id').value;
@@ -855,7 +871,7 @@ function openPaymentModal(type) {
 document.getElementById('addIncomeBtn').addEventListener('click', () => openPaymentModal('income'));
 document.getElementById('addExpenseBtn').addEventListener('click', () => openPaymentModal('expense'));
 
-document.getElementById('savePaymentBtn').addEventListener('click', async () => {
+guardClick('savePaymentBtn', async () => {
   const payload = {
     type: document.getElementById('paymentType').value,
     category: document.getElementById('paymentCategory').value.trim(),

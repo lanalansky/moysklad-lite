@@ -1,4 +1,4 @@
-const state = { products: [], contacts: [], orders: [] };
+const state = { products: [], contacts: [], orders: [], inventories: [] };
 
 const statusEl = document.getElementById('status');
 
@@ -25,9 +25,12 @@ async function loadAll() {
     state.products = data.products;
     state.contacts = data.contacts;
     state.orders = data.orders;
+    state.inventories = data.inventories || [];
     renderProducts();
     renderContacts();
     renderOrders();
+    renderInventories();
+    renderStock();
     setStatus('Обновлено: ' + new Date().toLocaleTimeString());
   } catch (err) {
     setStatus('Ошибка: ' + err.message, true);
@@ -41,6 +44,15 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+document.querySelectorAll('.subtab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.subtab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.subtab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('sub-' + btn.dataset.subtab).classList.add('active');
   });
 });
 
@@ -296,6 +308,285 @@ document.getElementById('saveOrderBtn').addEventListener('click', async () => {
   await loadAll();
 });
 
+// ---- Warehouse: shared product/group picker ----
+function initPicker(prefix, onAdd, onRemove) {
+  const chips = document.getElementById(prefix + 'PickerChips');
+  const search = document.getElementById(prefix + 'PickerSearch');
+  const suggestions = document.getElementById(prefix + 'PickerSuggestions');
+  let selected = [];
+
+  function render() {
+    chips.querySelectorAll('.picker-chip').forEach(c => c.remove());
+    selected.forEach(item => {
+      const chip = document.createElement('span');
+      chip.className = 'picker-chip';
+      chip.innerHTML = `<span class="kind">${item.type === 'group' ? 'Группа' : 'Товар'}</span> ${escapeHtml(item.label)} <span class="x">×</span>`;
+      chip.querySelector('.x').addEventListener('click', (e) => {
+        e.stopPropagation();
+        selected = selected.filter(s => s !== item);
+        render();
+        if (onRemove) onRemove(item);
+      });
+      chips.insertBefore(chip, search);
+    });
+  }
+
+  function showSuggestions(query) {
+    const q = query.trim().toLowerCase();
+    const groups = [...new Set(state.products.map(p => p.Group).filter(Boolean))]
+      .filter(g => !selected.some(s => s.type === 'group' && s.id === g))
+      .filter(g => !q || g.toLowerCase().includes(q))
+      .slice(0, 8)
+      .map(g => ({ type: 'group', id: g, label: g }));
+    const products = state.products
+      .filter(p => !selected.some(s => s.type === 'product' && s.id === p.ID))
+      .filter(p => !q || p.Name.toLowerCase().includes(q) || (p.Code || '').toLowerCase().includes(q) || (p.Article || '').toLowerCase().includes(q))
+      .slice(0, 8)
+      .map(p => ({ type: 'product', id: p.ID, label: p.Name }));
+    const items = groups.concat(products);
+    if (!items.length) { suggestions.hidden = true; return; }
+    suggestions.innerHTML = items.map((it, i) => `<div class="picker-suggestion" data-idx="${i}"><span>${escapeHtml(it.label)}</span><span class="kind">${it.type === 'group' ? 'группа' : 'товар'}</span></div>`).join('');
+    suggestions.hidden = false;
+    suggestions.querySelectorAll('.picker-suggestion').forEach((el, i) => {
+      el.addEventListener('click', () => {
+        selected.push(items[i]);
+        search.value = '';
+        suggestions.hidden = true;
+        render();
+        if (onAdd) onAdd(items[i]);
+      });
+    });
+  }
+
+  search.addEventListener('focus', () => showSuggestions(search.value));
+  search.addEventListener('input', () => showSuggestions(search.value));
+  document.addEventListener('click', (e) => {
+    if (!chips.parentElement.contains(e.target)) suggestions.hidden = true;
+  });
+
+  return {
+    getSelected: () => selected,
+    clear: () => { selected = []; render(); }
+  };
+}
+
+const turnoverPicker = initPicker('turnover');
+const stockPicker = initPicker('stock', () => renderStock(), () => renderStock());
+
+document.querySelectorAll('#turnoverNoMovementSwitch .switch-opt').forEach(opt => {
+  opt.addEventListener('click', () => {
+    document.querySelectorAll('#turnoverNoMovementSwitch .switch-opt').forEach(o => o.classList.remove('on'));
+    opt.classList.add('on');
+  });
+});
+
+// ---- Warehouse: Обороты ----
+async function showTurnover() {
+  const from = document.getElementById('turnoverFrom').value;
+  const to = document.getElementById('turnoverTo').value;
+  const sel = turnoverPicker.getSelected();
+  const productIds = sel.filter(s => s.type === 'product').map(s => s.id);
+  const groups = sel.filter(s => s.type === 'group').map(s => s.id);
+  const includeNoMovement = document.querySelector('#turnoverNoMovementSwitch .switch-opt.on').dataset.val === '1';
+  setStatus('Загрузка...');
+  try {
+    const rows = await api('getTurnover', {
+      dateFrom: from ? new Date(from + 'T00:00:00').toISOString() : null,
+      dateTo: to ? new Date(to + 'T23:59:59').toISOString() : new Date().toISOString(),
+      productIds, groups, includeNoMovement
+    });
+    renderTurnoverRows(rows);
+    setStatus('Обновлено: ' + new Date().toLocaleTimeString());
+  } catch (err) {
+    setStatus('Ошибка: ' + err.message, true);
+  }
+}
+
+function renderTurnoverRows(rows) {
+  const groupsMap = {};
+  rows.forEach(r => { (groupsMap[r.Group || 'Без группы'] = groupsMap[r.Group || 'Без группы'] || []).push(r); });
+  const totals = { startQty: 0, startSum: 0, inQty: 0, inSum: 0, outQty: 0, outSum: 0, endQty: 0, endSum: 0 };
+  let html = '';
+  Object.keys(groupsMap).forEach(g => {
+    html += `<tr class="cat-row"><td colspan="11">${escapeHtml(g)}</td></tr>`;
+    groupsMap[g].forEach(r => {
+      totals.startQty += r.StartQty; totals.startSum += r.StartSum;
+      totals.inQty += r.InQty; totals.inSum += r.InSum;
+      totals.outQty += r.OutQty; totals.outSum += r.OutSum;
+      totals.endQty += r.EndQty; totals.endSum += r.EndSum;
+      html += `<tr>
+        <td>${escapeHtml(r.Name)}</td><td>${escapeHtml(r.Code)}</td><td>${escapeHtml(r.Unit)}</td>
+        <td>${r.StartQty}</td><td>${formatMoney(r.StartSum)}</td>
+        <td class="in-cell">${r.InQty}</td><td class="in-cell">${formatMoney(r.InSum)}</td>
+        <td class="out-cell">${r.OutQty}</td><td class="out-cell">${formatMoney(r.OutSum)}</td>
+        <td>${r.EndQty}</td><td>${formatMoney(r.EndSum)}</td>
+      </tr>`;
+    });
+  });
+  document.getElementById('turnoverBody').innerHTML = html || '<tr><td colspan="11" style="text-align:center;color:var(--muted);">Нет данных за период</td></tr>';
+  document.getElementById('turnoverTotals').innerHTML = rows.length ? `<td colspan="3">Итого</td><td>${totals.startQty}</td><td>${formatMoney(totals.startSum)}</td><td>${totals.inQty}</td><td>${formatMoney(totals.inSum)}</td><td>${totals.outQty}</td><td>${formatMoney(totals.outSum)}</td><td>${totals.endQty}</td><td>${formatMoney(totals.endSum)}</td>` : '';
+}
+
+document.getElementById('turnoverShowBtn').addEventListener('click', showTurnover);
+
+// ---- Warehouse: Остатки ----
+let stockSnapshot = null;
+
+async function showStock() {
+  const asOfInput = document.getElementById('stockAsOf').value;
+  setStatus('Загрузка...');
+  try {
+    stockSnapshot = asOfInput ? await api('getStockAsOf', { asOf: new Date(asOfInput).toISOString() }) : null;
+    renderStock();
+    setStatus('Обновлено: ' + new Date().toLocaleTimeString());
+  } catch (err) {
+    setStatus('Ошибка: ' + err.message, true);
+  }
+}
+
+function renderStock() {
+  const products = stockSnapshot || state.products;
+  const sel = stockPicker.getSelected();
+  const productIds = sel.filter(s => s.type === 'product').map(s => s.id);
+  const groups = sel.filter(s => s.type === 'group').map(s => s.id);
+  const stockFilter = document.getElementById('stockFilterSelect').value;
+
+  let filtered = products;
+  if (productIds.length || groups.length) {
+    filtered = filtered.filter(p => productIds.includes(p.ID) || groups.includes(p.Group));
+  }
+  if (stockFilter === 'nonzero') filtered = filtered.filter(p => Number(p.Quantity) !== 0);
+  if (stockFilter === 'zero') filtered = filtered.filter(p => Number(p.Quantity) === 0);
+
+  const groupsMap = {};
+  filtered.forEach(p => { (groupsMap[p.Group || 'Без группы'] = groupsMap[p.Group || 'Без группы'] || []).push(p); });
+  const totals = { qty: 0, costSum: 0, saleSum: 0 };
+  let html = '';
+  Object.keys(groupsMap).forEach(g => {
+    html += `<tr class="stock-table-cat"><td colspan="8">${escapeHtml(g)}</td></tr>`;
+    groupsMap[g].forEach(p => {
+      const costSum = Number(p.Quantity) * Number(p.CostPrice || 0);
+      const saleSum = Number(p.Quantity) * Number(p.Price || 0);
+      totals.qty += Number(p.Quantity); totals.costSum += costSum; totals.saleSum += saleSum;
+      html += `<tr>
+        <td>${escapeHtml(p.Name)}</td><td>${escapeHtml(p.Code)}</td>
+        <td class="${Number(p.Quantity) <= 0 ? 'low-stock' : ''}">${p.Quantity}</td><td>${escapeHtml(p.Unit)}</td>
+        <td>${formatMoney(p.CostPrice)}</td><td>${formatMoney(costSum)}</td>
+        <td>${formatMoney(p.Price)}</td><td>${formatMoney(saleSum)}</td>
+      </tr>`;
+    });
+  });
+  document.getElementById('stockBody').innerHTML = html || '<tr><td colspan="8" style="text-align:center;color:var(--muted);">Нет товаров</td></tr>';
+  document.getElementById('stockTotals').innerHTML = filtered.length ? `<td colspan="2">Итого (${filtered.length})</td><td>${totals.qty}</td><td></td><td></td><td>${formatMoney(totals.costSum)}</td><td></td><td>${formatMoney(totals.saleSum)}</td>` : '';
+}
+
+document.getElementById('stockShowBtn').addEventListener('click', showStock);
+document.getElementById('stockFilterSelect').addEventListener('change', renderStock);
+
+// ---- Warehouse: Инвентаризации ----
+let countItems = [];
+
+function addSingleCountItem(productId) {
+  if (countItems.some(r => r.productId === productId)) return;
+  const p = state.products.find(x => x.ID === productId);
+  if (!p) return;
+  countItems.push({ productId: p.ID, name: p.Name, code: p.Code, unit: p.Unit, systemQty: Number(p.Quantity), actualQty: Number(p.Quantity) });
+}
+
+const inventoryPicker = initPicker('inventory', (item) => {
+  if (item.type === 'product') {
+    addSingleCountItem(item.id);
+  } else {
+    state.products.filter(p => p.Group === item.id).forEach(p => addSingleCountItem(p.ID));
+  }
+  renderCountItems();
+});
+
+function renderCountItems() {
+  const body = document.getElementById('inventoryItemsBody');
+  body.innerHTML = countItems.map((it, i) => {
+    const diff = it.actualQty - it.systemQty;
+    const diffClass = diff === 0 ? 'diff-zero' : (diff < 0 ? 'diff-neg' : 'diff-pos');
+    const diffText = diff === 0 ? '0' : (diff > 0 ? '+' + diff : String(diff));
+    return `<tr>
+      <td>${escapeHtml(it.name)}</td><td>${escapeHtml(it.code)}</td><td>${escapeHtml(it.unit)}</td>
+      <td>${it.systemQty}</td>
+      <td><input type="number" class="actual-input" data-idx="${i}" value="${it.actualQty}"></td>
+      <td class="diff-cell ${diffClass}">${diffText}</td>
+      <td class="actions"><button class="btn danger" data-remove-count-item="${i}">×</button></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--muted);">Добавьте товары или группу выше</td></tr>';
+}
+
+document.getElementById('inventoryItemsBody').addEventListener('input', (e) => {
+  if (!e.target.classList.contains('actual-input')) return;
+  const idx = Number(e.target.dataset.idx);
+  countItems[idx].actualQty = Number(e.target.value) || 0;
+  const diff = countItems[idx].actualQty - countItems[idx].systemQty;
+  const cell = e.target.closest('tr').querySelector('.diff-cell');
+  cell.className = 'diff-cell ' + (diff === 0 ? 'diff-zero' : (diff < 0 ? 'diff-neg' : 'diff-pos'));
+  cell.textContent = diff === 0 ? '0' : (diff > 0 ? '+' + diff : String(diff));
+});
+
+document.getElementById('inventoryItemsBody').addEventListener('click', (e) => {
+  const idx = e.target.dataset.removeCountItem;
+  if (idx !== undefined) { countItems.splice(Number(idx), 1); renderCountItems(); }
+});
+
+async function saveInventory(status) {
+  if (!countItems.length) { alert('Добавьте хотя бы один товар'); return; }
+  const payload = {
+    comment: document.getElementById('inventoryComment').value.trim(),
+    status,
+    items: countItems.map(it => ({ productId: it.productId, name: it.name, code: it.code, unit: it.unit, systemQty: it.systemQty, actualQty: it.actualQty }))
+  };
+  await api('addInventory', payload);
+  countItems = [];
+  document.getElementById('inventoryComment').value = '';
+  renderCountItems();
+  inventoryPicker.clear();
+  await loadAll();
+}
+
+document.getElementById('inventoryDraftBtn').addEventListener('click', () => saveInventory('draft'));
+document.getElementById('inventoryFinalizeBtn').addEventListener('click', () => saveInventory('done'));
+
+function renderInventories() {
+  const body = document.getElementById('inventoriesBody');
+  body.innerHTML = state.inventories.slice().reverse().map(inv => `
+    <tr>
+      <td>${formatDate(inv.Date)}</td>
+      <td><span class="status-pill ${inv.Status === 'done' ? 'done' : 'draft'}">${inv.Status === 'done' ? 'Проведена' : 'Черновик'}</span></td>
+      <td>${escapeHtml(inv.Comment)}</td>
+      <td>${(inv.Items || []).length}</td>
+      <td class="actions"><button class="btn danger" data-delete-inventory="${inv.ID}">Удалить</button></td>
+    </tr>
+  `).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--muted);">Пока нет инвентаризаций</td></tr>';
+}
+
+document.getElementById('inventoriesBody').addEventListener('click', async (e) => {
+  const delId = e.target.dataset.deleteInventory;
+  if (delId) {
+    if (!confirm('Удалить инвентаризацию? Если она проведена, остатки будут возвращены.')) return;
+    await api('deleteInventory', { id: delId });
+    await loadAll();
+  }
+});
+
+renderCountItems();
+
+// Defaults for warehouse date filters
+(function setWarehouseDefaults() {
+  const pad = n => String(n).padStart(2, '0');
+  const toDateVal = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+  const toDatetimeVal = d => toDateVal(d) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  const now = new Date();
+  const monthAgo = new Date(now.getTime() - 30 * 24 * 3600 * 1000);
+  document.getElementById('turnoverFrom').value = toDateVal(monthAgo);
+  document.getElementById('turnoverTo').value = toDateVal(now);
+  document.getElementById('stockAsOf').value = toDatetimeVal(now);
+})();
+
 // ---- Helpers ----
 function escapeHtml(str) {
   if (str === undefined || str === null) return '';
@@ -316,5 +607,5 @@ function formatDate(d) {
 if (!CONFIG.API_URL || CONFIG.API_URL.startsWith('PASTE_')) {
   setStatus('Укажите API_URL в config.js (см. README.md)', true);
 } else {
-  loadAll();
+  loadAll().then(showTurnover);
 }

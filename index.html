@@ -16,6 +16,7 @@
   <button class="tab-btn active" data-tab="products">Товары</button>
   <button class="tab-btn" data-tab="contacts">Контрагенты</button>
   <button class="tab-btn" data-tab="orders">Заказы</button>
+  <button class="tab-btn" data-tab="warehouse">Склад</button>
 </nav>
 
 <main>
@@ -52,6 +53,115 @@
       <thead><tr><th>Дата</th><th>Контрагент</th><th>Тип</th><th>Статус</th><th>Сумма</th><th></th></tr></thead>
       <tbody id="ordersBody"></tbody>
     </table>
+  </section>
+
+  <section id="tab-warehouse" class="tab-panel">
+    <nav class="subtabs">
+      <button class="subtab active" data-subtab="turnover">Обороты</button>
+      <button class="subtab" data-subtab="inventory">Инвентаризации</button>
+      <button class="subtab" data-subtab="stock">Остатки</button>
+    </nav>
+
+    <div id="sub-turnover" class="subtab-panel active">
+      <div class="filters">
+        <div class="field"><label>Период с</label><input type="date" id="turnoverFrom"></div>
+        <div class="field"><label>по</label><input type="date" id="turnoverTo"></div>
+        <div class="field picker" id="turnoverPickerField">
+          <label>Товар или группа</label>
+          <div class="picker-input" id="turnoverPickerChips"><input type="text" class="picker-search" id="turnoverPickerSearch" placeholder="+ добавить…" autocomplete="off"></div>
+          <div class="picker-suggestions" id="turnoverPickerSuggestions" hidden></div>
+        </div>
+        <div class="switch-field">
+          <label>Без движения</label>
+          <div class="switch" id="turnoverNoMovementSwitch"><span class="switch-opt on" data-val="0">Нет</span><span class="switch-opt" data-val="1">Да</span></div>
+        </div>
+        <button class="btn primary" id="turnoverShowBtn">Показать</button>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table turnover-table">
+          <thead>
+            <tr class="group-row">
+              <th colspan="3"></th>
+              <th colspan="2">Начало периода</th>
+              <th colspan="2">Приход</th>
+              <th colspan="2">Расход</th>
+              <th colspan="2">Конец периода</th>
+            </tr>
+            <tr>
+              <th>Наименование</th><th>Код</th><th>Ед.</th>
+              <th>Кол-во</th><th>Сумма</th>
+              <th>Кол-во</th><th>Сумма</th>
+              <th>Кол-во</th><th>Сумма</th>
+              <th>Кол-во</th><th>Сумма</th>
+            </tr>
+          </thead>
+          <tbody id="turnoverBody"></tbody>
+          <tfoot><tr id="turnoverTotals"></tr></tfoot>
+        </table>
+      </div>
+    </div>
+
+    <div id="sub-inventory" class="subtab-panel">
+      <div class="panel-head">
+        <h2>Инвентаризации</h2>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead><tr><th>Дата</th><th>Статус</th><th>Комментарий</th><th>Позиций</th><th></th></tr></thead>
+          <tbody id="inventoriesBody"></tbody>
+        </table>
+      </div>
+
+      <div class="section-divider">Новая инвентаризация</div>
+
+      <div class="new-count-card">
+        <div class="new-count-head">
+          <div class="field" style="min-width:260px;"><label>Комментарий</label><input type="text" id="inventoryComment" placeholder="например: плановая сверка"></div>
+        </div>
+        <div class="field picker" id="inventoryPickerField">
+          <label>Товар или группа</label>
+          <div class="picker-input" id="inventoryPickerChips"><input type="text" class="picker-search" id="inventoryPickerSearch" placeholder="+ добавить…" autocomplete="off"></div>
+          <div class="picker-suggestions" id="inventoryPickerSuggestions" hidden></div>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table count-table">
+            <thead><tr><th>Товар</th><th>Код</th><th>Ед.</th><th>По системе</th><th>Фактически</th><th>Разница</th><th></th></tr></thead>
+            <tbody id="inventoryItemsBody"></tbody>
+          </table>
+        </div>
+        <div class="count-actions">
+          <button class="btn" id="inventoryDraftBtn">Сохранить черновик</button>
+          <button class="btn primary" id="inventoryFinalizeBtn">Провести (обновить остатки)</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="sub-stock" class="subtab-panel">
+      <div class="filters">
+        <div class="field"><label>На дату и время</label><input type="datetime-local" id="stockAsOf"></div>
+        <div class="field picker" id="stockPickerField">
+          <label>Товар или группа</label>
+          <div class="picker-input" id="stockPickerChips"><input type="text" class="picker-search" id="stockPickerSearch" placeholder="+ добавить…" autocomplete="off"></div>
+          <div class="picker-suggestions" id="stockPickerSuggestions" hidden></div>
+        </div>
+        <div class="field">
+          <label>Остаток</label>
+          <select id="stockFilterSelect">
+            <option value="any">Любой</option>
+            <option value="nonzero">Ненулевой</option>
+            <option value="zero">Нулевой</option>
+          </select>
+        </div>
+        <button class="btn primary" id="stockShowBtn">Показать</button>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead><tr><th>Наименование</th><th>Код</th><th>Остаток</th><th>Ед.</th><th>Закуп. цена</th><th>Сумма закупки</th><th>Цена продажи</th><th>Сумма продажи</th></tr></thead>
+          <tbody id="stockBody"></tbody>
+          <tfoot><tr id="stockTotals"></tr></tfoot>
+        </table>
+      </div>
+    </div>
   </section>
 </main>
 

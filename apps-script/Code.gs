@@ -1,7 +1,7 @@
 // Google Apps Script backend for MoySkladLite.
 // Deploy: open your Google Sheet -> Extensions -> Apps Script -> paste this file -> Deploy as Web App (Execute as: Me, Who has access: Anyone).
 
-var PRODUCTS_HEADERS = ['ID', 'Name', 'SKU', 'Unit', 'Price', 'Quantity', 'Category'];
+var PRODUCTS_HEADERS = ['ID', 'Name', 'Group', 'Article', 'Code', 'Unit', 'MinPrice', 'CostPrice', 'Price', 'Quantity', 'Weight', 'Volume'];
 var CONTACTS_HEADERS = ['ID', 'Name', 'Type', 'Phone', 'Email', 'Address'];
 var ORDERS_HEADERS = ['ID', 'Date', 'ContactID', 'ContactName', 'Type', 'Status', 'ItemsJSON', 'Total'];
 
@@ -95,12 +95,18 @@ function getAll() {
 }
 
 // ---- Products ----
+function productFromPayload(p, id) {
+  return {
+    ID: id, Name: p.name, Group: p.group || '', Article: p.article || '', Code: p.code || '',
+    Unit: p.unit || 'шт', MinPrice: Number(p.minPrice) || 0, CostPrice: Number(p.costPrice) || 0,
+    Price: Number(p.price) || 0, Quantity: Number(p.quantity) || 0,
+    Weight: Number(p.weight) || 0, Volume: Number(p.volume) || 0
+  };
+}
+
 function addProduct(p) {
   var sheet = productsSheet();
-  var obj = {
-    ID: newId(), Name: p.name, SKU: p.sku || '', Unit: p.unit || 'шт',
-    Price: Number(p.price) || 0, Quantity: Number(p.quantity) || 0, Category: p.category || ''
-  };
+  var obj = productFromPayload(p, newId());
   sheet.appendRow(PRODUCTS_HEADERS.map(function (h) { return obj[h]; }));
   return obj;
 }
@@ -109,10 +115,7 @@ function updateProduct(p) {
   var sheet = productsSheet();
   var row = findRowById(sheet, p.id);
   if (row === -1) throw new Error('Товар не найден');
-  var obj = {
-    ID: p.id, Name: p.name, SKU: p.sku || '', Unit: p.unit || 'шт',
-    Price: Number(p.price) || 0, Quantity: Number(p.quantity) || 0, Category: p.category || ''
-  };
+  var obj = productFromPayload(p, p.id);
   setRowByHeaders(sheet, PRODUCTS_HEADERS, row, obj);
   return obj;
 }
@@ -213,4 +216,54 @@ function deleteOrder(o) {
   applyStockDelta(items, -1, type);
   sheet.deleteRow(row);
   return { id: o.orderId };
+}
+
+// ---- One-off legacy import from "Лист2" (МойСклад stock export) ----
+function importLegacyStock() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var src = ss.getSheetByName('Лист2');
+  var data = src.getDataRange().getValues();
+  var sheet = productsSheet();
+
+  sheet.clear();
+  sheet.appendRow(PRODUCTS_HEADERS);
+  sheet.setFrozenRows(1);
+
+  var currentCategory = '';
+  var rows = [];
+  for (var i = 2; i < data.length; i++) {
+    var row = data[i];
+    var stock = row[7];
+    if (stock === '' || stock === null) {
+      var cat = [row[0], row[1], row[2], row[3]].filter(function (v) { return v !== '' && v !== null; }).join('').trim();
+      if (cat) currentCategory = cat;
+      continue;
+    }
+    var name = String(row[2] || '').trim();
+    if (!name) continue;
+    var code = String(row[0] || '').trim();
+    var article = String(row[1] || '').trim();
+    var unit = String(row[3] || '').trim();
+    var costPrice = row[8];
+    var salePrice = row[10];
+    rows.push([
+      Utilities.getUuid(),
+      name,
+      currentCategory,
+      article,
+      code,
+      unit || 'шт',
+      0,
+      Number(costPrice) || 0,
+      Number(salePrice) || 0,
+      Number(stock) || 0,
+      0,
+      0
+    ]);
+  }
+  if (rows.length) {
+    sheet.getRange(2, 1, rows.length, PRODUCTS_HEADERS.length).setValues(rows);
+  }
+  Logger.log('IMPORTED: ' + rows.length);
+  return rows.length;
 }

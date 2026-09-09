@@ -56,9 +56,12 @@ function renderProducts() {
   body.innerHTML = state.products.map(p => `
     <tr>
       <td>${escapeHtml(p.Name)}</td>
-      <td>${escapeHtml(p.SKU)}</td>
-      <td>${escapeHtml(p.Category)}</td>
+      <td>${escapeHtml(p.Article)}</td>
+      <td>${escapeHtml(p.Code)}</td>
+      <td>${escapeHtml(p.Group)}</td>
       <td>${escapeHtml(p.Unit)}</td>
+      <td>${formatMoney(p.CostPrice)}</td>
+      <td>${formatMoney(p.MinPrice)}</td>
       <td>${formatMoney(p.Price)}</td>
       <td class="${Number(p.Quantity) <= 0 ? 'low-stock' : ''}">${p.Quantity}</td>
       <td class="actions">
@@ -69,15 +72,22 @@ function renderProducts() {
   `).join('');
 }
 
+function fillProductForm(p) {
+  document.getElementById('productId').value = p.ID || '';
+  document.getElementById('productName').value = p.Name || '';
+  document.getElementById('productGroup').value = p.Group || '';
+  document.getElementById('productArticle').value = p.Article || '';
+  document.getElementById('productCode').value = p.Code || '';
+  document.getElementById('productUnit').value = p.Unit || 'шт';
+  document.getElementById('productMinPrice').value = p.MinPrice || 0;
+  document.getElementById('productCostPrice').value = p.CostPrice || 0;
+  document.getElementById('productPrice').value = p.Price || 0;
+  document.getElementById('productQuantity').value = p.Quantity || 0;
+}
+
 document.getElementById('addProductBtn').addEventListener('click', () => {
   document.getElementById('productModalTitle').textContent = 'Новый товар';
-  document.getElementById('productId').value = '';
-  document.getElementById('productName').value = '';
-  document.getElementById('productSku').value = '';
-  document.getElementById('productCategory').value = '';
-  document.getElementById('productUnit').value = 'шт';
-  document.getElementById('productPrice').value = 0;
-  document.getElementById('productQuantity').value = 0;
+  fillProductForm({});
   openModal('productModal');
 });
 
@@ -87,13 +97,7 @@ document.getElementById('productsBody').addEventListener('click', async (e) => {
   if (editId) {
     const p = state.products.find(x => x.ID === editId);
     document.getElementById('productModalTitle').textContent = 'Изменить товар';
-    document.getElementById('productId').value = p.ID;
-    document.getElementById('productName').value = p.Name;
-    document.getElementById('productSku').value = p.SKU;
-    document.getElementById('productCategory').value = p.Category;
-    document.getElementById('productUnit').value = p.Unit;
-    document.getElementById('productPrice').value = p.Price;
-    document.getElementById('productQuantity').value = p.Quantity;
+    fillProductForm(p);
     openModal('productModal');
   } else if (delId) {
     if (!confirm('Удалить товар?')) return;
@@ -104,16 +108,21 @@ document.getElementById('productsBody').addEventListener('click', async (e) => {
 
 document.getElementById('saveProductBtn').addEventListener('click', async () => {
   const id = document.getElementById('productId').value;
+  const costPriceInput = document.getElementById('productCostPrice');
   const payload = {
     id,
     name: document.getElementById('productName').value.trim(),
-    sku: document.getElementById('productSku').value.trim(),
-    category: document.getElementById('productCategory').value.trim(),
+    group: document.getElementById('productGroup').value.trim(),
+    article: document.getElementById('productArticle').value.trim(),
+    code: document.getElementById('productCode').value.trim(),
     unit: document.getElementById('productUnit').value.trim(),
+    minPrice: document.getElementById('productMinPrice').value,
+    costPrice: costPriceInput.value,
     price: document.getElementById('productPrice').value,
     quantity: document.getElementById('productQuantity').value
   };
   if (!payload.name) { alert('Укажите название'); return; }
+  if (costPriceInput.value === '') { alert('Укажите закупочную цену'); costPriceInput.focus(); return; }
   await api(id ? 'updateProduct' : 'addProduct', payload);
   closeModal('productModal');
   await loadAll();

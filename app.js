@@ -252,27 +252,65 @@ document.getElementById('addOrderBtn').addEventListener('click', () => {
 
 function addOrderItemRow() {
   const row = document.createElement('tr');
-  const options = state.products.map(p => `<option value="${p.ID}" data-cost="${p.CostPrice}">${escapeHtml(p.Name)}</option>`).join('');
   row.innerHTML = `
-    <td><select class="item-product">${options}</select></td>
+    <td class="item-product-cell">
+      <input type="hidden" class="item-product-id">
+      <input type="text" class="item-product-search" placeholder="Название, код или артикул…" autocomplete="off">
+      <div class="picker-suggestions item-product-suggestions" hidden></div>
+    </td>
     <td><input type="number" class="item-qty" value="1" min="0.01" step="0.01"></td>
     <td><input type="number" class="item-price" value="0" min="0" step="0.01"></td>
     <td class="item-sum">0</td>
     <td class="actions"><button class="btn danger" data-remove-item>×</button></td>
   `;
   document.getElementById('orderItemsBody').appendChild(row);
-  const productSelect = row.querySelector('.item-product');
+
+  const idInput = row.querySelector('.item-product-id');
+  const searchInput = row.querySelector('.item-product-search');
+  const suggestBox = row.querySelector('.item-product-suggestions');
   const priceInput = row.querySelector('.item-price');
-  const setPriceFromProduct = () => {
-    const opt = productSelect.options[productSelect.selectedIndex];
-    priceInput.value = opt ? opt.dataset.cost : 0;
-    updateRowSum(row);
-  };
-  productSelect.addEventListener('change', setPriceFromProduct);
+
+  function showProductSuggestions(query) {
+    const q = query.trim().toLowerCase();
+    if (!q) { suggestBox.hidden = true; return; }
+    const matches = state.products.filter(p =>
+      p.Name.toLowerCase().includes(q) ||
+      (p.Code || '').toLowerCase().includes(q) ||
+      (p.Article || '').toLowerCase().includes(q)
+    ).slice(0, 10);
+    if (!matches.length) {
+      suggestBox.innerHTML = '<div class="picker-suggestion" style="color:var(--muted);">Не найдено</div>';
+      suggestBox.hidden = false;
+      return;
+    }
+    suggestBox.innerHTML = matches.map((p, i) => `
+      <div class="picker-suggestion" data-idx="${i}">
+        <span>${escapeHtml(p.Name)}</span>
+        <span class="kind">${escapeHtml(p.Code || p.Article || '')} · ост. ${p.Quantity}</span>
+      </div>
+    `).join('');
+    suggestBox.hidden = false;
+    suggestBox.querySelectorAll('.picker-suggestion[data-idx]').forEach((el, i) => {
+      el.addEventListener('click', () => {
+        const p = matches[i];
+        idInput.value = p.ID;
+        searchInput.value = p.Name;
+        suggestBox.hidden = true;
+        priceInput.value = p.CostPrice || 0;
+        updateRowSum(row);
+      });
+    });
+  }
+
+  searchInput.addEventListener('input', () => showProductSuggestions(searchInput.value));
+  searchInput.addEventListener('focus', () => { if (searchInput.value) showProductSuggestions(searchInput.value); });
+  document.addEventListener('click', (e) => {
+    if (!row.contains(e.target)) suggestBox.hidden = true;
+  });
+
   row.querySelector('.item-qty').addEventListener('input', () => updateRowSum(row));
   priceInput.addEventListener('input', () => updateRowSum(row));
   row.querySelector('[data-remove-item]').addEventListener('click', () => { row.remove(); updateOrderTotal(); });
-  setPriceFromProduct();
 }
 
 function updateRowSum(row) {
@@ -302,7 +340,7 @@ document.getElementById('orderDelivery').addEventListener('input', updateOrderTo
 document.getElementById('saveOrderBtn').addEventListener('click', async () => {
   const rows = document.querySelectorAll('#orderItemsBody tr');
   const items = Array.from(rows).map(row => ({
-    productId: row.querySelector('.item-product').value,
+    productId: row.querySelector('.item-product-id').value,
     qty: Number(row.querySelector('.item-qty').value),
     price: Number(row.querySelector('.item-price').value)
   })).filter(i => i.productId && i.qty > 0);

@@ -1,4 +1,4 @@
-const state = { products: [], contacts: [], orders: [], inventories: [] };
+const state = { products: [], contacts: [], orders: [], inventories: [], sales: [], payments: [] };
 
 const statusEl = document.getElementById('status');
 
@@ -29,7 +29,7 @@ function setStatus(text, isError) {
   statusEl.className = 'status' + (isError ? ' error' : '');
 }
 
-const createButtonIds = ['addProductBtn', 'addContactBtn', 'addOrderBtn'];
+const createButtonIds = ['addProductBtn', 'addContactBtn', 'addOrderBtn', 'addSaleBtn'];
 function setCreateButtonsEnabled(enabled) {
   createButtonIds.forEach(id => { document.getElementById(id).disabled = !enabled; });
 }
@@ -43,11 +43,15 @@ async function loadAll() {
     state.contacts = data.contacts;
     state.orders = data.orders;
     state.inventories = data.inventories || [];
+    state.sales = data.sales || [];
+    state.payments = data.payments || [];
     renderProducts();
     renderContacts();
     renderOrders();
     renderInventories();
     renderStock();
+    renderSales();
+    renderPayments();
     setStatus('Обновлено: ' + new Date().toLocaleTimeString());
   } catch (err) {
     setStatus('Ошибка: ' + err.message, true);
@@ -262,7 +266,10 @@ document.getElementById('addOrderBtn').addEventListener('click', () => {
   openModal('orderModal');
 });
 
-function addOrderItemRow() {
+// Shared factory for a table row with a searchable product picker (used by
+// both Orders and Sales item tables). priceFn picks the default price to fill
+// in when a product is selected (cost price for purchases, sale price for sales).
+function createProductPickerRow(containerId, priceFn, onChange) {
   const row = document.createElement('tr');
   row.innerHTML = `
     <td class="item-product-cell">
@@ -274,11 +281,18 @@ function addOrderItemRow() {
     <td class="item-sum">0</td>
     <td class="actions"><button class="btn danger" data-remove-item>×</button></td>
   `;
-  document.getElementById('orderItemsBody').appendChild(row);
+  document.getElementById(containerId).appendChild(row);
 
   const idInput = row.querySelector('.item-product-id');
   const searchInput = row.querySelector('.item-product-search');
   const priceInput = row.querySelector('.item-price');
+
+  function updateRowSum() {
+    const qty = Number(row.querySelector('.item-qty').value) || 0;
+    const price = Number(priceInput.value) || 0;
+    row.querySelector('.item-sum').textContent = formatMoney(qty * price);
+    onChange();
+  }
 
   // Rendered on <body>, not inside the table, so it can't get clipped or
   // painted under later siblings by the table's own stacking context.
@@ -322,8 +336,8 @@ function addOrderItemRow() {
         idInput.value = p.ID;
         searchInput.value = p.Name;
         suggestBox.hidden = true;
-        priceInput.value = p.CostPrice || 0;
-        updateRowSum(row);
+        priceInput.value = priceFn(p) || 0;
+        updateRowSum();
       });
     });
   }
@@ -334,20 +348,17 @@ function addOrderItemRow() {
     if (!row.contains(e.target) && !suggestBox.contains(e.target)) suggestBox.hidden = true;
   });
 
-  row.querySelector('.item-qty').addEventListener('input', () => updateRowSum(row));
-  priceInput.addEventListener('input', () => updateRowSum(row));
+  row.querySelector('.item-qty').addEventListener('input', updateRowSum);
+  priceInput.addEventListener('input', updateRowSum);
   row.querySelector('[data-remove-item]').addEventListener('click', () => {
     row.remove();
     suggestBox.remove();
-    updateOrderTotal();
+    onChange();
   });
 }
 
-function updateRowSum(row) {
-  const qty = Number(row.querySelector('.item-qty').value) || 0;
-  const price = Number(row.querySelector('.item-price').value) || 0;
-  row.querySelector('.item-sum').textContent = formatMoney(qty * price);
-  updateOrderTotal();
+function addOrderItemRow() {
+  createProductPickerRow('orderItemsBody', p => p.CostPrice, updateOrderTotal);
 }
 
 function updateOrderTotal() {
@@ -663,7 +674,238 @@ renderCountItems();
   document.getElementById('turnoverFrom').value = toDateVal(monthAgo);
   document.getElementById('turnoverTo').value = toDateVal(now);
   document.getElementById('stockAsOf').value = toDatetimeVal(now);
+  document.getElementById('salesFrom').value = toDateVal(monthAgo);
+  document.getElementById('salesTo').value = toDateVal(now);
+  document.getElementById('paymentsFrom').value = toDateVal(monthAgo);
+  document.getElementById('paymentsTo').value = toDateVal(now);
+  document.getElementById('pnlFrom').value = toDateVal(monthAgo);
+  document.getElementById('pnlTo').value = toDateVal(now);
 })();
+
+// ---- Sales (продажи) ----
+function renderSales() {
+  const body = document.getElementById('salesBody');
+  const sales = state.sales.slice().reverse();
+  body.innerHTML = sales.map(s => `
+    <tr>
+      <td>${formatDate(s.Date)}</td>
+      <td>${(s.Items || []).length}</td>
+      <td>${formatMoney(s.CashAmount)}</td>
+      <td>${formatMoney(s.CardAmount)}</td>
+      <td>${formatMoney(s.Discount)}</td>
+      <td>${formatMoney(s.Total)}</td>
+      <td>${escapeHtml(s.Comment)}</td>
+      <td class="actions"><button class="btn danger" data-delete-sale="${s.ID}">Удалить</button></td>
+    </tr>
+  `).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--muted);">Пока нет продаж</td></tr>';
+  const totals = sales.reduce((acc, s) => {
+    acc.cash += Number(s.CashAmount) || 0;
+    acc.card += Number(s.CardAmount) || 0;
+    acc.discount += Number(s.Discount) || 0;
+    acc.total += Number(s.Total) || 0;
+    return acc;
+  }, { cash: 0, card: 0, discount: 0, total: 0 });
+  document.getElementById('salesTotals').innerHTML = sales.length
+    ? `<td colspan="2">Итого</td><td>${formatMoney(totals.cash)}</td><td>${formatMoney(totals.card)}</td><td>${formatMoney(totals.discount)}</td><td>${formatMoney(totals.total)}</td><td colspan="2"></td>`
+    : '';
+}
+
+document.getElementById('salesBody').addEventListener('click', async (e) => {
+  const delId = e.target.dataset.deleteSale;
+  if (delId) {
+    if (!confirm('Удалить продажу? Остатки на складе будут возвращены.')) return;
+    await api('deleteSale', { id: delId });
+    await loadAll();
+  }
+});
+
+document.getElementById('salesShowBtn').addEventListener('click', renderSales);
+
+function addSaleItemRow() {
+  createProductPickerRow('saleItemsBody', p => p.Price, updateSaleTotal);
+}
+
+function updateSaleTotal() {
+  const rows = document.querySelectorAll('#saleItemsBody tr');
+  let subtotal = 0;
+  rows.forEach(row => {
+    const qty = Number(row.querySelector('.item-qty')?.value) || 0;
+    const price = Number(row.querySelector('.item-price')?.value) || 0;
+    subtotal += qty * price;
+  });
+  const discount = Number(document.getElementById('saleDiscount').value) || 0;
+  const total = Math.max(0, subtotal - discount);
+  document.getElementById('saleSubtotal').textContent = formatMoney(subtotal);
+  document.getElementById('saleDiscountTotal').textContent = formatMoney(discount);
+  document.getElementById('saleTotal').textContent = formatMoney(total);
+  document.getElementById('saleCash').value = total.toFixed(2);
+  document.getElementById('saleCard').value = '0.00';
+}
+
+document.getElementById('addSaleItemBtn').addEventListener('click', addSaleItemRow);
+document.getElementById('saleDiscount').addEventListener('input', updateSaleTotal);
+
+// Keep cash + card in sync with the total: editing one adjusts the other.
+document.getElementById('saleCash').addEventListener('input', () => {
+  const total = Number(document.getElementById('saleTotal').textContent.replace(/\s/g, '').replace(',', '.')) || 0;
+  const cash = Number(document.getElementById('saleCash').value) || 0;
+  document.getElementById('saleCard').value = Math.max(0, total - cash).toFixed(2);
+});
+document.getElementById('saleCard').addEventListener('input', () => {
+  const total = Number(document.getElementById('saleTotal').textContent.replace(/\s/g, '').replace(',', '.')) || 0;
+  const card = Number(document.getElementById('saleCard').value) || 0;
+  document.getElementById('saleCash').value = Math.max(0, total - card).toFixed(2);
+});
+
+document.getElementById('addSaleBtn').addEventListener('click', () => {
+  document.querySelectorAll('#saleItemsBody .item-product-suggestions').forEach(el => el.remove());
+  document.getElementById('saleItemsBody').innerHTML = '';
+  document.getElementById('saleDiscount').value = 0;
+  document.getElementById('saleComment').value = '';
+  addSaleItemRow();
+  updateSaleTotal();
+  openModal('saleModal');
+});
+
+document.getElementById('saveSaleBtn').addEventListener('click', async () => {
+  const rows = document.querySelectorAll('#saleItemsBody tr');
+  const items = Array.from(rows).map(row => {
+    const productId = row.querySelector('.item-product-id').value;
+    const product = state.products.find(p => p.ID === productId);
+    return {
+      productId,
+      name: product ? product.Name : '',
+      qty: Number(row.querySelector('.item-qty').value),
+      price: Number(row.querySelector('.item-price').value)
+    };
+  }).filter(i => i.productId && i.qty > 0);
+  if (items.length === 0) { alert('Добавьте хотя бы одну позицию'); return; }
+  const payload = {
+    items,
+    discount: Number(document.getElementById('saleDiscount').value) || 0,
+    cashAmount: Number(document.getElementById('saleCash').value) || 0,
+    cardAmount: Number(document.getElementById('saleCard').value) || 0,
+    comment: document.getElementById('saleComment').value.trim()
+  };
+  await api('addSale', payload);
+  closeModal('saleModal');
+  await loadAll();
+});
+
+// ---- Payments (касса) ----
+const paymentTypeLabels = { income: 'Приход', expense: 'Расход' };
+
+function renderPayments() {
+  const from = document.getElementById('paymentsFrom').value;
+  const to = document.getElementById('paymentsTo').value;
+  const fromDate = from ? new Date(from + 'T00:00:00') : null;
+  const toDate = to ? new Date(to + 'T23:59:59') : null;
+  const filtered = state.payments.filter(p => {
+    const d = new Date(p.Date);
+    if (fromDate && d < fromDate) return false;
+    if (toDate && d > toDate) return false;
+    return true;
+  });
+  const sorted = filtered.slice().reverse();
+  const body = document.getElementById('paymentsBody');
+  body.innerHTML = sorted.map(p => `
+    <tr>
+      <td>${formatDate(p.Date)}</td>
+      <td><span class="pill ${p.Type === 'income' ? 'in' : 'out'}">${paymentTypeLabels[p.Type] || p.Type}</span></td>
+      <td>${escapeHtml(p.Category)}</td>
+      <td class="${p.Type === 'income' ? 'amt-in' : 'amt-out'}">${formatMoney(p.Amount)}</td>
+      <td>${escapeHtml(p.Comment)}</td>
+      <td class="actions">${p.RefId ? '' : `<button class="btn danger" data-delete-payment="${p.ID}">Удалить</button>`}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);">Нет платежей за период</td></tr>';
+
+  const totals = filtered.reduce((acc, p) => {
+    if (p.Type === 'income') acc.income += Number(p.Amount) || 0;
+    else acc.expense += Number(p.Amount) || 0;
+    return acc;
+  }, { income: 0, expense: 0 });
+  document.getElementById('paymentsIncomeTotal').textContent = formatMoney(totals.income);
+  document.getElementById('paymentsExpenseTotal').textContent = formatMoney(totals.expense);
+  document.getElementById('paymentsNetTotal').textContent = formatMoney(totals.income - totals.expense);
+
+  const categories = [...new Set(state.payments.map(p => p.Category).filter(Boolean))];
+  document.getElementById('paymentCategoryList').innerHTML = categories.map(c => `<option value="${escapeHtml(c)}">`).join('');
+}
+
+document.getElementById('paymentsShowBtn').addEventListener('click', renderPayments);
+
+document.getElementById('paymentsBody').addEventListener('click', async (e) => {
+  const delId = e.target.dataset.deletePayment;
+  if (delId) {
+    if (!confirm('Удалить платёж?')) return;
+    await api('deletePayment', { id: delId });
+    await loadAll();
+  }
+});
+
+function openPaymentModal(type) {
+  document.getElementById('paymentModalTitle').textContent = type === 'income' ? 'Приход' : 'Расход';
+  document.getElementById('paymentType').value = type;
+  document.getElementById('paymentCategory').value = '';
+  document.getElementById('paymentAmount').value = 0;
+  document.getElementById('paymentComment').value = '';
+  openModal('paymentModal');
+}
+
+document.getElementById('addIncomeBtn').addEventListener('click', () => openPaymentModal('income'));
+document.getElementById('addExpenseBtn').addEventListener('click', () => openPaymentModal('expense'));
+
+document.getElementById('savePaymentBtn').addEventListener('click', async () => {
+  const payload = {
+    type: document.getElementById('paymentType').value,
+    category: document.getElementById('paymentCategory').value.trim(),
+    amount: Number(document.getElementById('paymentAmount').value) || 0,
+    comment: document.getElementById('paymentComment').value.trim()
+  };
+  if (!payload.category) { alert('Укажите статью'); return; }
+  if (!payload.amount) { alert('Укажите сумму'); return; }
+  await api('addPayment', payload);
+  closeModal('paymentModal');
+  await loadAll();
+});
+
+// ---- P&L (Прибыли и убытки) ----
+async function showPnl() {
+  const from = document.getElementById('pnlFrom').value;
+  const to = document.getElementById('pnlTo').value;
+  setStatus('Загрузка...');
+  try {
+    const data = await api('getPnl', {
+      dateFrom: from ? new Date(from + 'T00:00:00').toISOString() : null,
+      dateTo: to ? new Date(to + 'T23:59:59').toISOString() : new Date().toISOString()
+    });
+    renderPnl(data);
+    setStatus('Обновлено: ' + new Date().toLocaleTimeString());
+  } catch (err) {
+    setStatus('Ошибка: ' + err.message, true);
+  }
+}
+
+function renderPnl(data) {
+  const expenseRows = data.expensesByCategory.map(e =>
+    `<tr class="pnl-row-sub"><td>${escapeHtml(e.category)}</td><td>${formatMoney(e.amount)}</td></tr>`
+  ).join('');
+  const opProfitNegClass = data.operatingProfit < 0 ? ' pnl-row-neg' : '';
+  const netProfitColor = data.netProfit < 0 ? ' style="color:#ff8a80;"' : '';
+  document.getElementById('pnlTable').innerHTML = `
+    <tr class="pnl-row-bold pnl-revenue"><td>Выручка (продажи)</td><td>${formatMoney(data.revenue)}</td></tr>
+    <tr><td>Себестоимость проданного</td><td>${formatMoney(data.cogs)}</td></tr>
+    <tr class="pnl-row-bold pnl-gross"><td>Валовая прибыль</td><td>${formatMoney(data.grossProfit)}</td></tr>
+    <tr class="pnl-section-label"><td>Операционные расходы</td><td></td></tr>
+    ${expenseRows}
+    <tr class="pnl-row-bold pnl-operating"><td>Итого операционные расходы</td><td>${formatMoney(data.totalExpenses)}</td></tr>
+    <tr class="pnl-row-bold pnl-operating${opProfitNegClass}"><td>Операционная прибыль</td><td>${formatMoney(data.operatingProfit)}</td></tr>
+    <tr><td>Налоги и сборы</td><td>${formatMoney(data.taxes)}</td></tr>
+    <tr class="pnl-row-bold pnl-net"><td>Чистая прибыль</td><td${netProfitColor}>${formatMoney(data.netProfit)}</td></tr>
+  `;
+}
+
+document.getElementById('pnlShowBtn').addEventListener('click', showPnl);
 
 // ---- Helpers ----
 function escapeHtml(str) {
@@ -685,5 +927,5 @@ function formatDate(d) {
 if (!CONFIG.API_URL || CONFIG.API_URL.startsWith('PASTE_')) {
   setStatus('Укажите API_URL в config.js (см. README.md)', true);
 } else {
-  loadAll().then(showTurnover);
+  loadAll().then(() => { showTurnover(); showPnl(); });
 }

@@ -218,12 +218,16 @@ main { padding: 24px; }
   margin-top: 4px;
 }
 
-#orderItemsBody select, #orderItemsBody input {
+#orderItemsBody select, #orderItemsBody input,
+#saleItemsBody select, #saleItemsBody input {
   width: 100%;
   padding: 6px 8px;
   border: 1px solid var(--border);
   border-radius: 6px;
 }
+
+.pay-split { display: flex; gap: 16px; margin: 16px 0; }
+.pay-split label { flex: 1; }
 
 .item-product-cell { min-width: 240px; }
 .picker-suggestions.item-product-suggestions { max-height: 240px; overflow-y: auto; z-index: 1000; }
@@ -398,3 +402,35 @@ tfoot td { font-weight: 700; background: #f0f4fb; border-top: 2px solid var(--bo
 .status-pill { font-size: 12px; padding: 3px 10px; border-radius: 999px; font-weight: 600; }
 .status-pill.draft { background: #fff4e0; color: #8a5a00; }
 .status-pill.done { background: #eaf6ec; color: #1a7f37; }
+
+/* ---- Payments (Платежи) ---- */
+.head-actions { display: flex; gap: 10px; }
+.btn.income { background: #1a7f37; border-color: #1a7f37; color: #fff; font-weight: 600; }
+.btn.expense { background: #b3261e; border-color: #b3261e; color: #fff; font-weight: 600; }
+
+.summary-row { display: flex; gap: 16px; margin-bottom: 20px; }
+.summary-card { flex: 1; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; }
+.summary-card .label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.summary-card .value { font-size: 22px; font-weight: 700; margin-top: 6px; }
+.summary-card.income .value { color: #1a7f37; }
+.summary-card.expense .value { color: #b3261e; }
+
+.pill { font-size: 12px; padding: 3px 10px; border-radius: 999px; font-weight: 600; }
+.pill.in { background: #eaf6ec; color: #1a7f37; }
+.pill.out { background: #fbe9e8; color: #b3261e; }
+.amt-in { color: #1a7f37; font-weight: 600; }
+.amt-out { color: #b3261e; font-weight: 600; }
+
+/* ---- P&L (Прибыли и убытки) ---- */
+.pnl-table { width: 100%; max-width: 640px; border-collapse: collapse; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; font-size: 14px; }
+.pnl-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+.pnl-table td:last-child { text-align: right; }
+.pnl-table tr:last-child td { border-bottom: none; }
+.pnl-row-bold td { font-weight: 700; }
+.pnl-row-bold.pnl-revenue td { background: #fafbfc; }
+.pnl-row-bold.pnl-gross td, .pnl-row-bold.pnl-operating td { background: #f0f4fb; }
+.pnl-row-bold.pnl-net td { background: var(--text); color: #fff; font-size: 15.5px; }
+.pnl-row-neg td:last-child { color: #b3261e; }
+.pnl-row-sub td:first-child { padding-left: 32px; color: var(--muted); font-size: 13.5px; }
+.pnl-row-sub td:last-child { color: var(--muted); }
+.pnl-section-label td { padding-top: 16px; font-weight: 700; }

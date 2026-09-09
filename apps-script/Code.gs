@@ -6,6 +6,8 @@ var CONTACTS_HEADERS = ['ID', 'Name', 'Type', 'Phone', 'Email', 'Address'];
 var ORDERS_HEADERS = ['ID', 'Date', 'ContactID', 'ContactName', 'Type', 'Status', 'ItemsJSON', 'Delivery', 'Total'];
 var MOVEMENTS_HEADERS = ['ID', 'Date', 'ProductId', 'ProductName', 'Delta', 'Type', 'RefId', 'RefLabel'];
 var INVENTORIES_HEADERS = ['ID', 'Date', 'Comment', 'Status', 'ItemsJSON'];
+var SALES_HEADERS = ['ID', 'Date', 'ItemsJSON', 'CashAmount', 'CardAmount', 'Discount', 'Total', 'Comment'];
+var PAYMENTS_HEADERS = ['ID', 'Date', 'Type', 'Category', 'Amount', 'Comment', 'RefId', 'RefLabel'];
 
 function getSheet(name, headers) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -23,6 +25,8 @@ function contactsSheet() { return getSheet('Contacts', CONTACTS_HEADERS); }
 function ordersSheet() { return getSheet('Orders', ORDERS_HEADERS); }
 function movementsSheet() { return getSheet('Movements', MOVEMENTS_HEADERS); }
 function inventoriesSheet() { return getSheet('Inventories', INVENTORIES_HEADERS); }
+function salesSheet() { return getSheet('Sales', SALES_HEADERS); }
+function paymentsSheet() { return getSheet('Payments', PAYMENTS_HEADERS); }
 
 function sheetToObjects(sheet, headers) {
   var data = sheet.getDataRange().getValues();
@@ -82,6 +86,11 @@ function doPost(e) {
       case 'getStockAsOf': result = getStockAsOf(payload); break;
       case 'addInventory': result = addInventory(payload); break;
       case 'deleteInventory': result = deleteInventory(payload); break;
+      case 'addSale': result = addSale(payload); break;
+      case 'deleteSale': result = deleteSale(payload); break;
+      case 'addPayment': result = addPayment(payload); break;
+      case 'deletePayment': result = deletePayment(payload); break;
+      case 'getPnl': result = getPnl(payload); break;
       default: throw new Error('Unknown action: ' + action);
     }
     return jsonResponse({ ok: true, data: result });
@@ -103,7 +112,12 @@ function getAll() {
     inv.Items = JSON.parse(inv.ItemsJSON || '[]');
     return inv;
   });
-  return { products: products, contacts: contacts, orders: orders, inventories: inventories };
+  var sales = sheetToObjects(salesSheet(), SALES_HEADERS).map(function (s) {
+    s.Items = JSON.parse(s.ItemsJSON || '[]');
+    return s;
+  });
+  var payments = sheetToObjects(paymentsSheet(), PAYMENTS_HEADERS);
+  return { products: products, contacts: contacts, orders: orders, inventories: inventories, sales: sales, payments: payments };
 }
 
 // ---- Products ----
@@ -393,6 +407,104 @@ function deleteOrder(o) {
   applyStockDelta(items, -1, type, o.orderId, 'Удаление заказа');
   sheet.deleteRow(row);
   return { id: o.orderId };
+}
+
+// ---- Sales (розничные продажи) ----
+function addSale(o) {
+  var items = (o.items || []).map(function (i) {
+    return { productId: i.productId, name: i.name, qty: Number(i.qty), price: Number(i.price) };
+  });
+  var subtotal = items.reduce(function (sum, i) { return sum + i.qty * i.price; }, 0);
+  var discount = Number(o.discount) || 0;
+  var cashAmount = Number(o.cashAmount) || 0;
+  var cardAmount = Number(o.cardAmount) || 0;
+  var obj = {
+    ID: newId(), Date: new Date(), ItemsJSON: JSON.stringify(items),
+    CashAmount: cashAmount, CardAmount: cardAmount, Discount: discount,
+    Total: subtotal - discount, Comment: o.comment || ''
+  };
+  var sheet = salesSheet();
+  sheet.appendRow(SALES_HEADERS.map(function (h) { return obj[h]; }));
+  applyStockDelta(items, 1, 'sale', obj.ID, 'Продажа');
+  obj.Items = items;
+  return obj;
+}
+
+function deleteSale(payload) {
+  var sheet = salesSheet();
+  var row = findRowById(sheet, payload.id);
+  if (row === -1) throw new Error('Продажа не найдена');
+  var data = sheet.getRange(row, 1, 1, SALES_HEADERS.length).getValues()[0];
+  var items = JSON.parse(data[SALES_HEADERS.indexOf('ItemsJSON')] || '[]');
+  applyStockDelta(items, -1, 'sale', payload.id, 'Удаление продажи');
+  sheet.deleteRow(row);
+  return { id: payload.id };
+}
+
+// ---- Payments (касса: прочие приходы/расходы, не связанные с закупкой товара) ----
+function addPayment(p) {
+  var obj = {
+    ID: newId(), Date: new Date(), Type: p.type === 'income' ? 'income' : 'expense',
+    Category: p.category || 'Прочее', Amount: Math.abs(Number(p.amount)) || 0,
+    Comment: p.comment || '', RefId: p.refId || '', RefLabel: p.refLabel || ''
+  };
+  var sheet = paymentsSheet();
+  sheet.appendRow(PAYMENTS_HEADERS.map(function (h) { return obj[h]; }));
+  return obj;
+}
+
+function deletePayment(payload) {
+  var sheet = paymentsSheet();
+  var row = findRowById(sheet, payload.id);
+  if (row === -1) throw new Error('Платёж не найден');
+  sheet.deleteRow(row);
+  return { id: payload.id };
+}
+
+// ---- Profit & Loss ----
+function getPnl(payload) {
+  var dateFrom = payload.dateFrom ? new Date(payload.dateFrom) : null;
+  var dateTo = payload.dateTo ? new Date(payload.dateTo) : new Date();
+  var inRange = function (d) {
+    var dd = new Date(d);
+    if (dateFrom && dd < dateFrom) return false;
+    if (dd > dateTo) return false;
+    return true;
+  };
+
+  var products = sheetToObjects(productsSheet(), PRODUCTS_HEADERS);
+  var costById = {};
+  products.forEach(function (p) { costById[p.ID] = Number(p.CostPrice) || 0; });
+
+  var sales = sheetToObjects(salesSheet(), SALES_HEADERS).filter(function (s) { return inRange(s.Date); });
+  var revenue = 0, cogs = 0;
+  sales.forEach(function (s) {
+    revenue += Number(s.Total);
+    var items = JSON.parse(s.ItemsJSON || '[]');
+    items.forEach(function (i) { cogs += Number(i.qty) * (costById[i.productId] || 0); });
+  });
+  var grossProfit = revenue - cogs;
+
+  var TAX_CATEGORY = 'Налоги и сборы';
+  var payments = sheetToObjects(paymentsSheet(), PAYMENTS_HEADERS)
+    .filter(function (p) { return p.Type === 'expense' && inRange(p.Date); });
+  var byCategory = {};
+  var taxes = 0;
+  payments.forEach(function (p) {
+    var amt = Number(p.Amount);
+    if (p.Category === TAX_CATEGORY) { taxes += amt; return; }
+    byCategory[p.Category] = (byCategory[p.Category] || 0) + amt;
+  });
+  var expensesByCategory = Object.keys(byCategory).map(function (cat) { return { category: cat, amount: byCategory[cat] }; });
+  var totalExpenses = expensesByCategory.reduce(function (sum, e) { return sum + e.amount; }, 0);
+  var operatingProfit = grossProfit - totalExpenses;
+  var netProfit = operatingProfit - taxes;
+
+  return {
+    revenue: revenue, cogs: cogs, grossProfit: grossProfit,
+    expensesByCategory: expensesByCategory, totalExpenses: totalExpenses,
+    operatingProfit: operatingProfit, taxes: taxes, netProfit: netProfit
+  };
 }
 
 // ---- One-off legacy import from "Лист2" (МойСклад stock export) ----

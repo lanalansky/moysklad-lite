@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MoySkladLite</title>
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
 <header class="topbar">
@@ -16,6 +16,8 @@
   <button class="tab-btn active" data-tab="products">Товары</button>
   <button class="tab-btn" data-tab="contacts">Контрагенты</button>
   <button class="tab-btn" data-tab="orders">Заказы</button>
+  <button class="tab-btn" data-tab="sales">Продажи</button>
+  <button class="tab-btn" data-tab="money">Деньги</button>
   <button class="tab-btn" data-tab="warehouse">Склад</button>
 </nav>
 
@@ -53,6 +55,68 @@
       <thead><tr><th>Дата</th><th>Поставщик</th><th>Статус</th><th>Сумма</th><th></th></tr></thead>
       <tbody id="ordersBody"></tbody>
     </table>
+  </section>
+
+  <section id="tab-sales" class="tab-panel">
+    <div class="panel-head">
+      <h2>Продажи</h2>
+      <button class="btn primary" id="addSaleBtn">+ Продажа</button>
+    </div>
+    <div class="filters">
+      <div class="field"><label>Период с</label><input type="date" id="salesFrom"></div>
+      <div class="field"><label>по</label><input type="date" id="salesTo"></div>
+      <button class="btn primary" id="salesShowBtn">Показать</button>
+    </div>
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead><tr><th>Дата</th><th>Товаров</th><th>Наличными</th><th>Безналичными</th><th>Скидка</th><th>Итого</th><th>Комментарий</th><th></th></tr></thead>
+        <tbody id="salesBody"></tbody>
+        <tfoot><tr id="salesTotals"></tr></tfoot>
+      </table>
+    </div>
+  </section>
+
+  <section id="tab-money" class="tab-panel">
+    <nav class="subtabs">
+      <button class="subtab active" data-subtab="payments">Платежи</button>
+      <button class="subtab" data-subtab="pnl">Прибыли и убытки</button>
+    </nav>
+
+    <div id="sub-payments" class="subtab-panel active">
+      <div class="panel-head">
+        <h2>Платежи</h2>
+        <div class="head-actions">
+          <button class="btn income" id="addIncomeBtn">+ Приход</button>
+          <button class="btn expense" id="addExpenseBtn">+ Расход</button>
+        </div>
+      </div>
+      <div class="filters">
+        <div class="field"><label>Период с</label><input type="date" id="paymentsFrom"></div>
+        <div class="field"><label>по</label><input type="date" id="paymentsTo"></div>
+        <button class="btn primary" id="paymentsShowBtn">Показать</button>
+      </div>
+      <div class="summary-row">
+        <div class="summary-card income"><div class="label">Приход за период</div><div class="value" id="paymentsIncomeTotal">0,00</div></div>
+        <div class="summary-card expense"><div class="label">Расход за период</div><div class="value" id="paymentsExpenseTotal">0,00</div></div>
+        <div class="summary-card"><div class="label">Итого</div><div class="value" id="paymentsNetTotal">0,00</div></div>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead><tr><th>Дата</th><th>Тип</th><th>Статья</th><th>Сумма</th><th>Комментарий</th><th></th></tr></thead>
+          <tbody id="paymentsBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="sub-pnl" class="subtab-panel">
+      <div class="panel-head"><h2>Прибыли и убытки</h2></div>
+      <div class="filters">
+        <div class="field"><label>Период с</label><input type="date" id="pnlFrom"></div>
+        <div class="field"><label>по</label><input type="date" id="pnlTo"></div>
+        <button class="btn primary" id="pnlShowBtn">Найти</button>
+      </div>
+      <table class="pnl-table" id="pnlTable"></table>
+    </div>
   </section>
 
   <section id="tab-warehouse" class="tab-panel">
@@ -248,7 +312,52 @@
   </div>
 </div>
 
-<script src="config.js?v=3"></script>
-<script src="app.js?v=3"></script>
+<!-- Sale modal -->
+<div class="modal" id="saleModal">
+  <div class="modal-content wide">
+    <h3>Новая продажа</h3>
+    <table class="data-table" id="saleItemsTable">
+      <thead><tr><th>Товар</th><th>Кол-во</th><th>Цена</th><th>Сумма</th><th></th></tr></thead>
+      <tbody id="saleItemsBody"></tbody>
+    </table>
+    <button class="btn" id="addSaleItemBtn">+ Добавить позицию</button>
+    <label>Скидка<input type="number" id="saleDiscount" step="0.01" value="0"></label>
+    <div class="pay-split">
+      <label>Наличными<input type="number" id="saleCash" step="0.01" value="0"></label>
+      <label>Безналичными<input type="number" id="saleCard" step="0.01" value="0"></label>
+    </div>
+    <label>Комментарий<input type="text" id="saleComment"></label>
+    <div class="order-totals">
+      <div><span>Товары</span><span id="saleSubtotal">0</span></div>
+      <div><span>Скидка</span><span id="saleDiscountTotal">0</span></div>
+      <div class="final"><span>Итого</span><span id="saleTotal">0</span></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" data-close="saleModal">Отмена</button>
+      <button class="btn primary" id="saveSaleBtn">Провести продажу</button>
+    </div>
+  </div>
+</div>
+
+<!-- Payment modal -->
+<div class="modal" id="paymentModal">
+  <div class="modal-content">
+    <h3 id="paymentModalTitle">Платёж</h3>
+    <input type="hidden" id="paymentType">
+    <label>Статья
+      <input type="text" id="paymentCategory" list="paymentCategoryList" placeholder="например: Аренда">
+      <datalist id="paymentCategoryList"></datalist>
+    </label>
+    <label>Сумма<input type="number" id="paymentAmount" step="0.01" value="0"></label>
+    <label>Комментарий<input type="text" id="paymentComment"></label>
+    <div class="modal-actions">
+      <button class="btn" data-close="paymentModal">Отмена</button>
+      <button class="btn primary" id="savePaymentBtn">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<script src="config.js?v=5"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Касса продавца — MoySkladLite</title>
+<link rel="manifest" href="manifest.json?v=2">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="theme-color" content="#0ea59d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Касса">
+<link rel="stylesheet" href="kassa.css?v=2">
+</head>
+<body>
+
+<div class="load-status" id="loadStatus"></div>
+
+<div id="app">
+
+  <!-- CATALOG -->
+  <div class="view active" id="view-catalog">
+    <div class="appbar">
+      <h1>Касса</h1>
+      <div class="search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input placeholder="Название, код или артикул…" id="searchInput" autocomplete="off">
+      </div>
+      <button class="held-chip hidden" id="heldBtn">⏱ Отложенные <span class="cnt" id="heldCount">0</span></button>
+    </div>
+    <div class="catalog-list" id="catalogList"></div>
+    <div class="cart-bar hidden" id="cartBar">
+      <span><span class="n" id="cartBarCount">0</span>товаров в чеке</span>
+      <span id="cartBarSum">0,00 ₽</span>
+    </div>
+  </div>
+
+  <!-- CART -->
+  <div class="view" id="view-cart">
+    <div class="view-head">
+      <button class="icon-btn" data-nav="catalog">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <h2>Чек</h2>
+    </div>
+    <div class="cart-list" id="cartList"></div>
+    <div class="discount-chip">
+      <span>Скидка на чек</span>
+      <span><input id="discountInput" type="number" value="0" min="0" inputmode="decimal"> ₽</span>
+    </div>
+    <div class="summary">
+      <div class="summary-row"><span>Товары</span><span id="sumSubtotal">0,00 ₽</span></div>
+      <div class="summary-row"><span>Скидка</span><span id="sumDiscount">0,00 ₽</span></div>
+      <div class="summary-row final"><span>Итого</span><span id="sumTotal">0,00 ₽</span></div>
+    </div>
+    <div class="cta-bar">
+      <div class="cta-row">
+        <button class="hold-btn" id="holdBtn" title="Отложить чек">⏱</button>
+        <button class="cta" id="checkoutBtn"><span>Оформить</span><span class="r" id="ctaTotal">0,00 ₽</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HELD CHECKS -->
+  <div class="view" id="view-held">
+    <div class="view-head">
+      <button class="icon-btn" data-nav="catalog">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <h2>Отложенные чеки</h2>
+    </div>
+    <div class="held-list" id="heldList"></div>
+  </div>
+
+  <!-- PAYMENT -->
+  <div class="view" id="view-pay">
+    <div class="view-head">
+      <button class="icon-btn" data-nav="cart">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <h2>Оплата</h2>
+    </div>
+    <div class="pay-scroll">
+      <div class="pay-total">
+        <div class="lbl">К оплате</div>
+        <div class="amt" id="payTotal">0,00 ₽</div>
+      </div>
+      <div class="pay-methods">
+        <div class="pay-method">
+          <div class="pm-head">💵 Наличными</div>
+          <div class="cash-row"><input id="cashInput" type="number" placeholder="Получено, ₽" inputmode="decimal"></div>
+          <div class="change" id="changeRow">Сдача: <b>0,00 ₽</b></div>
+          <button class="pm-btn cash" data-pay="cash" style="margin-top:10px;">Оплачено наличными</button>
+        </div>
+        <div class="pay-method">
+          <div class="pm-head">💳 Безналичными</div>
+          <div class="provider-chips" id="cardProviders">
+            <button class="provider-chip active" data-provider="Тинькофф">Тинькофф</button>
+            <button class="provider-chip" data-provider="Сбер">Сбер</button>
+            <button class="provider-chip" data-provider="Другое">Другое</button>
+          </div>
+          <input class="provider-comment" id="cardComment" type="text" placeholder="Комментарий, например: перевод Иванову">
+          <button class="pm-btn card" data-pay="card">Оплачено картой</button>
+        </div>
+        <div class="pay-method">
+          <div class="pm-head">💵💳 Смешанная</div>
+          <div class="mix-row">
+            <div class="fld"><div class="l">НАЛИЧНЫМИ</div><input id="mixCash" type="number" value="0" inputmode="decimal"></div>
+            <div class="fld"><div class="l">БЕЗНАЛОМ</div><input id="mixCard" type="number" value="0" inputmode="decimal"></div>
+          </div>
+          <div class="provider-chips" id="mixProviders">
+            <button class="provider-chip active" data-provider="Тинькофф">Тинькофф</button>
+            <button class="provider-chip" data-provider="Сбер">Сбер</button>
+            <button class="provider-chip" data-provider="Другое">Другое</button>
+          </div>
+          <input class="provider-comment" id="mixComment" type="text" placeholder="Комментарий, например: перевод Иванову">
+          <button class="pm-btn mixed" data-pay="mixed">Провести смешанную</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUCCESS -->
+  <div class="view" id="view-success">
+    <div class="success">
+      <div class="check">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#18a558" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+      </div>
+      <h2>Продажа проведена</h2>
+      <div class="amt" id="successAmt">0,00 ₽</div>
+      <div class="method" id="successMethod">Наличными</div>
+      <button class="cta" id="newSaleBtn"><span>Новая продажа</span><span class="r">→</span></button>
+    </div>
+  </div>
+
+  <!-- REPORT (today, resets automatically, no shift open/close) -->
+  <div class="view" id="view-report">
+    <div class="appbar" style="padding-bottom:0;"><h1>Отчёт</h1></div>
+    <div class="shift-scroll">
+      <div class="report-date"><span class="dot"></span><span id="reportDate">Сегодня</span></div>
+
+      <div class="shift-hero">
+        <div class="l">Выручка сегодня</div>
+        <div class="v" id="repRevenue">0,00 ₽</div>
+        <div class="sub"><span id="repCash">Нал. 0,00 ₽</span><span id="repCard">Безнал. 0,00 ₽</span></div>
+      </div>
+
+      <div class="shift-actions">
+        <button id="cashInBtn">↓ Внести деньги</button>
+        <button id="cashOutBtn">↑ Выплатить деньги</button>
+      </div>
+
+      <div class="stat-list">
+        <div class="stat-row section"><span class="k">Продажи</span><span class="k" id="repSales">0 · 0,00 ₽</span></div>
+        <div class="stat-row pending"><span class="k">Отложено (не оплачено)</span><span class="v" id="repPending">0 · 0,00 ₽</span></div>
+        <div class="stat-row"><span class="k">Возвраты</span><span class="v">0,00 ₽</span></div>
+        <div class="stat-row"><span class="kk">Итого выручка</span><span class="v" id="repTotal">0,00 ₽</span></div>
+      </div>
+
+      <div class="section-title">Внесения и выплаты сегодня</div>
+      <div class="movement-list" id="movementsList"></div>
+    </div>
+  </div>
+
+  <!-- HISTORY (read-only, no cancel/edit) -->
+  <div class="view" id="view-history">
+    <div class="appbar" style="padding-bottom:0;"><h1>История</h1></div>
+    <div class="history-list">
+      <div class="history-note">🔒 Только просмотр — отменить продажу может администратор в основной версии сайта</div>
+      <div id="historyList"></div>
+    </div>
+  </div>
+
+  <!-- ITEM EDIT SHEET -->
+  <div class="sheet-backdrop" id="sheetBackdrop">
+    <div class="sheet">
+      <div class="sheet-head">
+        <div class="ci-thumb" id="sheetThumb">Б</div>
+        <div>
+          <div class="sheet-title" id="sheetName">Товар</div>
+          <div class="sheet-sub" id="sheetSub">код · остаток</div>
+        </div>
+      </div>
+      <div class="stepper">
+        <span class="lbl">Количество</span>
+        <div class="stepper-ctl">
+          <button id="qtyMinus">−</button>
+          <span class="val" id="qtyVal">1</span>
+          <button id="qtyPlus">+</button>
+        </div>
+      </div>
+      <div class="field-row"><span class="lbl">Цена за штуку</span><input id="priceInput" type="number" inputmode="decimal"></div>
+      <button class="sheet-save" id="sheetSaveBtn">Сохранить</button>
+      <button class="sheet-remove" id="sheetRemoveBtn">Удалить из чека</button>
+    </div>
+  </div>
+
+  <!-- CASH MOVEMENT SHEET (Внесение / Выплата) -->
+  <div class="sheet-backdrop" id="cashSheetBackdrop">
+    <div class="sheet">
+      <div class="sheet-head">
+        <div class="sheet-title" id="cashSheetTitle" style="font-size:15px;">Внесение денег</div>
+      </div>
+      <div class="field-row"><span class="lbl">Сумма</span><input id="cashSheetAmount" type="number" placeholder="0" inputmode="decimal"></div>
+      <div class="field-row" style="align-items:flex-start;">
+        <span class="lbl" style="padding-top:8px;">Комментарий</span>
+        <input id="cashSheetComment" type="text" placeholder="например: размен" style="text-align:right;">
+      </div>
+      <button class="sheet-save" id="cashSheetSaveBtn">Сохранить</button>
+    </div>
+  </div>
+
+  <!-- SALE DETAIL SHEET (read-only, no cancel) -->
+  <div class="sheet-backdrop" id="saleDetailBackdrop">
+    <div class="sheet">
+      <div class="sheet-head">
+        <div>
+          <div class="sheet-title" id="saleDetailTime" style="font-size:15px;">—</div>
+          <div class="sheet-sub" id="saleDetailMethod">—</div>
+        </div>
+      </div>
+      <div class="sd-lock">🔒 Только просмотр — без возможности отмены</div>
+      <div class="sd-items" id="saleDetailItems"></div>
+      <div class="summary-row"><span>Товары</span><span id="saleDetailSubtotal">0,00 ₽</span></div>
+      <div class="summary-row"><span>Скидка</span><span id="saleDetailDiscount">0,00 ₽</span></div>
+      <div class="summary-row final"><span>Итого</span><span id="saleDetailTotal">0,00 ₽</span></div>
+      <button class="sd-close" id="saleDetailCloseBtn">Закрыть</button>
+    </div>
+  </div>
+
+  <!-- TAB BAR -->
+  <nav class="tabbar">
+    <button class="tab-btn active" data-tab="catalog">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-6 9 6v10a1 1 0 01-1 1H4a1 1 0 01-1-1z"/><path d="M9 21V12h6v9"/></svg>
+      Касса
+    </button>
+    <button class="tab-btn" data-tab="history">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+      История
+    </button>
+    <button class="tab-btn" data-tab="report">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+      Отчёт
+    </button>
+  </nav>
+
+</div>
+
+<script src="config.js?v=2"></script>
+<script src="kassa.js?v=2"></script>
+</body>
+</html>

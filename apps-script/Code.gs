@@ -6,8 +6,9 @@ var CONTACTS_HEADERS = ['ID', 'Name', 'Type', 'Phone', 'Email', 'Address'];
 var ORDERS_HEADERS = ['ID', 'Date', 'ContactID', 'ContactName', 'Type', 'Status', 'ItemsJSON', 'Delivery', 'Total'];
 var MOVEMENTS_HEADERS = ['ID', 'Date', 'ProductId', 'ProductName', 'Delta', 'Type', 'RefId', 'RefLabel'];
 var INVENTORIES_HEADERS = ['ID', 'Date', 'Comment', 'Status', 'ItemsJSON'];
-var SALES_HEADERS = ['ID', 'Date', 'ItemsJSON', 'CashAmount', 'CardAmount', 'Discount', 'Total', 'Comment'];
+var SALES_HEADERS = ['ID', 'Date', 'ItemsJSON', 'CashAmount', 'CardAmount', 'Discount', 'Total', 'Comment', 'Provider'];
 var PAYMENTS_HEADERS = ['ID', 'Date', 'Type', 'Category', 'Amount', 'Comment', 'RefId', 'RefLabel'];
+var HELD_HEADERS = ['ID', 'Date', 'ItemsJSON', 'Discount'];
 
 function getSheet(name, headers) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -25,8 +26,20 @@ function contactsSheet() { return getSheet('Contacts', CONTACTS_HEADERS); }
 function ordersSheet() { return getSheet('Orders', ORDERS_HEADERS); }
 function movementsSheet() { return getSheet('Movements', MOVEMENTS_HEADERS); }
 function inventoriesSheet() { return getSheet('Inventories', INVENTORIES_HEADERS); }
-function salesSheet() { return getSheet('Sales', SALES_HEADERS); }
+function salesSheet() {
+  var sheet = getSheet('Sales', SALES_HEADERS);
+  // Migration: sheets created before the Provider column existed only have 8
+  // columns. Add the 9th header in place rather than rewriting SALES_HEADERS
+  // positions, so old rows stay aligned with their existing columns.
+  var lastCol = sheet.getLastColumn();
+  var headerRow = lastCol > 0 ? sheet.getRange(1, 1, 1, lastCol).getValues()[0] : [];
+  if (headerRow.indexOf('Provider') === -1) {
+    sheet.getRange(1, headerRow.length + 1).setValue('Provider');
+  }
+  return sheet;
+}
 function paymentsSheet() { return getSheet('Payments', PAYMENTS_HEADERS); }
+function heldSheet() { return getSheet('Held', HELD_HEADERS); }
 
 function sheetToObjects(sheet, headers) {
   var data = sheet.getDataRange().getValues();
@@ -90,6 +103,9 @@ function doPost(e) {
       case 'deleteSale': result = deleteSale(payload); break;
       case 'addPayment': result = addPayment(payload); break;
       case 'deletePayment': result = deletePayment(payload); break;
+      case 'addHeld': result = addHeld(payload); break;
+      case 'updateHeld': result = updateHeld(payload); break;
+      case 'deleteHeld': result = deleteHeld(payload); break;
       case 'getPnl': result = getPnl(payload); break;
       default: throw new Error('Unknown action: ' + action);
     }
@@ -117,7 +133,11 @@ function getAll() {
     return s;
   });
   var payments = sheetToObjects(paymentsSheet(), PAYMENTS_HEADERS);
-  return { products: products, contacts: contacts, orders: orders, inventories: inventories, sales: sales, payments: payments };
+  var held = sheetToObjects(heldSheet(), HELD_HEADERS).map(function (h) {
+    h.Items = JSON.parse(h.ItemsJSON || '[]');
+    return h;
+  });
+  return { products: products, contacts: contacts, orders: orders, inventories: inventories, sales: sales, payments: payments, held: held };
 }
 
 // ---- Products ----
@@ -421,12 +441,16 @@ function addSale(o) {
   var obj = {
     ID: newId(), Date: new Date(), ItemsJSON: JSON.stringify(items),
     CashAmount: cashAmount, CardAmount: cardAmount, Discount: discount,
-    Total: subtotal - discount, Comment: o.comment || ''
+    Total: subtotal - discount, Comment: o.comment || '', Provider: o.provider || ''
   };
   var sheet = salesSheet();
   sheet.appendRow(SALES_HEADERS.map(function (h) { return obj[h]; }));
   applyStockDelta(items, 1, 'sale', obj.ID, 'Продажа');
   obj.Items = items;
+  if (o.heldId) {
+    var heldRow = findRowById(heldSheet(), o.heldId);
+    if (heldRow !== -1) heldSheet().deleteRow(heldRow);
+  }
   return obj;
 }
 
@@ -437,6 +461,38 @@ function deleteSale(payload) {
   var data = sheet.getRange(row, 1, 1, SALES_HEADERS.length).getValues()[0];
   var items = JSON.parse(data[SALES_HEADERS.indexOf('ItemsJSON')] || '[]');
   applyStockDelta(items, -1, 'sale', payload.id, 'Удаление продажи');
+  sheet.deleteRow(row);
+  return { id: payload.id };
+}
+
+// ---- Held (отложенные, неоплаченные чеки продавца) ----
+function addHeld(payload) {
+  var items = (payload.items || []).map(function (i) {
+    return { productId: i.productId, name: i.name, qty: Number(i.qty), price: Number(i.price) };
+  });
+  var obj = { ID: newId(), Date: new Date(), ItemsJSON: JSON.stringify(items), Discount: Number(payload.discount) || 0 };
+  heldSheet().appendRow(HELD_HEADERS.map(function (h) { return obj[h]; }));
+  obj.Items = items;
+  return obj;
+}
+
+function updateHeld(payload) {
+  var sheet = heldSheet();
+  var row = findRowById(sheet, payload.id);
+  if (row === -1) throw new Error('Отложенный чек не найден');
+  var items = (payload.items || []).map(function (i) {
+    return { productId: i.productId, name: i.name, qty: Number(i.qty), price: Number(i.price) };
+  });
+  var obj = { ID: payload.id, Date: new Date(), ItemsJSON: JSON.stringify(items), Discount: Number(payload.discount) || 0 };
+  setRowByHeaders(sheet, HELD_HEADERS, row, obj);
+  obj.Items = items;
+  return obj;
+}
+
+function deleteHeld(payload) {
+  var sheet = heldSheet();
+  var row = findRowById(sheet, payload.id);
+  if (row === -1) throw new Error('Отложенный чек не найден');
   sheet.deleteRow(row);
   return { id: payload.id };
 }

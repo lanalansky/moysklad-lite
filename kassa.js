@@ -519,13 +519,16 @@ async function saveCashMovement() {
   const amount = Number(document.getElementById('cashSheetAmount').value) || 0;
   const comment = document.getElementById('cashSheetComment').value.trim();
   if (!amount) return;
+  // Close right away instead of waiting for the server: a slow response
+  // (Apps Script cold start) left the sheet sitting open looking stuck,
+  // which is what led someone to back out and retry, saving it twice.
+  closeCashSheet();
   setStatus('Сохранение...');
   try {
     const type = cashSheetType === 'in' ? 'income' : 'expense';
     const category = cashSheetType === 'in' ? 'Внесение' : 'Выплата';
     const payment = await api('addPayment', { type, category, amount, comment });
     state.payments.push(payment);
-    closeCashSheet();
     renderReport();
     setStatus('Сохранено');
   } catch (err) {

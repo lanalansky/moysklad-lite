@@ -16,6 +16,21 @@ function setStatus(text, isError) {
   if (!isError) statusTimer = setTimeout(() => statusEl.classList.remove('show'), 1400);
 }
 
+// Disables the button for the duration of the handler so a slow response
+// (Apps Script can take several seconds) doesn't invite a second tap that
+// submits the same document twice. Mirrors guardClick() in app.js.
+function guardClick(el, handler) {
+  el.addEventListener('click', async (e) => {
+    if (el.disabled) return;
+    el.disabled = true;
+    try {
+      await handler(e);
+    } finally {
+      el.disabled = false;
+    }
+  });
+}
+
 async function api(action, payload) {
   const maxAttempts = 3;
   let lastErr;
@@ -263,7 +278,7 @@ function updateHeldChip() {
   btn.classList.toggle('hidden', state.held.length === 0);
 }
 
-document.getElementById('holdBtn').addEventListener('click', holdCurrentCart);
+guardClick(document.getElementById('holdBtn'), holdCurrentCart);
 document.getElementById('heldBtn').addEventListener('click', () => goto('held'));
 
 async function holdCurrentCart() {
@@ -439,8 +454,17 @@ function applyLocalSaleEffects(sale, items, heldId) {
   renderReport();
 }
 
-document.querySelectorAll('[data-pay]').forEach(btn => {
-  btn.addEventListener('click', () => completeSale(btn.dataset.pay));
+const payButtons = document.querySelectorAll('[data-pay]');
+payButtons.forEach(btn => {
+  btn.addEventListener('click', async () => {
+    if (btn.disabled) return;
+    payButtons.forEach(b => b.disabled = true);
+    try {
+      await completeSale(btn.dataset.pay);
+    } finally {
+      payButtons.forEach(b => b.disabled = false);
+    }
+  });
 });
 
 document.getElementById('newSaleBtn').addEventListener('click', () => {
@@ -511,7 +535,7 @@ async function saveCashMovement() {
 
 document.getElementById('cashInBtn').addEventListener('click', () => openCashSheet('in'));
 document.getElementById('cashOutBtn').addEventListener('click', () => openCashSheet('out'));
-document.getElementById('cashSheetSaveBtn').addEventListener('click', saveCashMovement);
+guardClick(document.getElementById('cashSheetSaveBtn'), saveCashMovement);
 document.getElementById('cashSheetBackdrop').addEventListener('click', e => {
   if (e.target.id === 'cashSheetBackdrop') closeCashSheet();
 });

@@ -1,4 +1,4 @@
-let state = { products: [], sales: [], payments: [], held: [] };
+let state = { products: [], services: [], sales: [], payments: [], held: [] };
 let cart = {}; // productId -> { qty, price }
 let discount = 0;
 let resumingHeldId = null;
@@ -54,8 +54,12 @@ function isToday(d) {
   const now = new Date();
   return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
 }
+// Товары have a Quantity (stock); услуги don't — that's how the catalog
+// tells the two apart wherever it needs different rendering or behavior.
+function getCatalogItems() { return state.products.concat(state.services); }
+function findCatalogItem(id) { return state.products.find(x => x.ID === id) || state.services.find(x => x.ID === id); }
 function productName(id) {
-  const p = state.products.find(x => x.ID === id);
+  const p = findCatalogItem(id);
   return p ? p.Name : '';
 }
 
@@ -65,6 +69,7 @@ async function loadAll(silent) {
   try {
     const data = await api('getAll');
     state.products = data.products || [];
+    state.services = data.services || [];
     state.sales = data.sales || [];
     state.payments = data.payments || [];
     state.held = data.held || [];
@@ -83,21 +88,23 @@ async function loadAll(silent) {
 function renderCatalog(filter) {
   const q = (filter || '').trim().toLowerCase();
   const list = document.getElementById('catalogList');
-  const items = state.products.filter(p => !q ||
+  const items = getCatalogItems().filter(p => !q ||
     String(p.Name || '').toLowerCase().includes(q) ||
     String(p.Code || '').toLowerCase().includes(q) ||
     String(p.Article || '').toLowerCase().includes(q)
   );
   list.innerHTML = items.map(p => {
+    const isService = p.Quantity === undefined;
     const inCart = !!cart[p.ID];
     const controls = inCart
       ? `<div class="qty-stepper"><button data-dec="${p.ID}">−</button><span class="qv">${cart[p.ID].qty}</span><button data-inc="${p.ID}">+</button></div>`
       : `<button class="add-btn" data-add="${p.ID}">+</button>`;
+    const meta = isService ? '<span class="stock">услуга</span>' : `<span class="stock ${Number(p.Quantity) <= 0 ? 'low' : ''}">ост. ${p.Quantity}</span>`;
     return `<div class="product-row">
       <div class="product-thumb">${initials(p.Name)}</div>
       <div class="product-info">
         <div class="product-name">${escapeHtml(p.Name)}</div>
-        <div class="product-meta"><span>${escapeHtml(p.Code || p.Article || '')}</span><span class="stock ${Number(p.Quantity) <= 0 ? 'low' : ''}">ост. ${p.Quantity}</span></div>
+        <div class="product-meta"><span>${escapeHtml(p.Code || p.Article || '')}</span>${meta}</div>
       </div>
       <div class="product-price"><span class="amt">${money(p.Price)}</span></div>
       ${controls}
@@ -124,7 +131,7 @@ document.getElementById('catalogList').addEventListener('click', e => {
   const decId = e.target.closest('[data-dec]')?.dataset.dec;
   const id = addId || incId || decId;
   if (!id) return;
-  const p = state.products.find(x => x.ID === id);
+  const p = findCatalogItem(id);
   if (!p) return;
   if (addId || incId) {
     if (!cart[id]) cart[id] = { qty: 1, price: Number(p.Price) || 0 };
@@ -170,7 +177,7 @@ function renderCart() {
   const ids = Object.keys(cart);
   const list = document.getElementById('cartList');
   list.innerHTML = ids.map((id, i) => {
-    const p = state.products.find(x => x.ID === id) || { Name: 'Товар удалён', Code: '' };
+    const p = findCatalogItem(id) || { Name: 'Товар удалён', Code: '' };
     const c = cart[id];
     return `<div class="cart-item" data-edit="${id}">
       <span class="num">${i + 1}</span>
@@ -209,11 +216,11 @@ document.getElementById('checkoutBtn').addEventListener('click', () => {
 // ---- Item edit sheet ----
 function openSheet(id) {
   editingId = id;
-  const p = state.products.find(x => x.ID === id) || { Name: 'Товар', Code: '', Quantity: 0 };
+  const p = findCatalogItem(id) || { Name: 'Товар', Code: '' };
   const c = cart[id];
   document.getElementById('sheetThumb').textContent = initials(p.Name);
   document.getElementById('sheetName').textContent = p.Name;
-  document.getElementById('sheetSub').textContent = (p.Code || p.Article || '') + ' · остаток ' + p.Quantity;
+  document.getElementById('sheetSub').textContent = (p.Code || p.Article || '') + (p.Quantity === undefined ? ' · услуга' : ' · остаток ' + p.Quantity);
   document.getElementById('qtyVal').textContent = c.qty;
   document.getElementById('priceInput').value = c.price;
   document.getElementById('sheetBackdrop').classList.add('open');

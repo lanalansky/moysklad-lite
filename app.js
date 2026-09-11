@@ -1,4 +1,4 @@
-const state = { products: [], contacts: [], orders: [], inventories: [], sales: [], payments: [] };
+const state = { products: [], contacts: [], orders: [], inventories: [], sales: [], payments: [], services: [] };
 
 const statusEl = document.getElementById('status');
 
@@ -45,7 +45,7 @@ function guardClick(id, handler) {
   });
 }
 
-const createButtonIds = ['addProductBtn', 'addContactBtn', 'addOrderBtn', 'addSaleBtn'];
+const createButtonIds = ['addProductBtn', 'addServiceBtn', 'addContactBtn', 'addOrderBtn', 'addSaleBtn'];
 function setCreateButtonsEnabled(enabled) {
   createButtonIds.forEach(id => { document.getElementById(id).disabled = !enabled; });
 }
@@ -61,7 +61,9 @@ async function loadAll() {
     state.inventories = data.inventories || [];
     state.sales = data.sales || [];
     state.payments = data.payments || [];
+    state.services = data.services || [];
     renderProducts();
+    renderServices();
     renderContacts();
     renderOrders();
     renderInventories();
@@ -179,6 +181,67 @@ guardClick('saveProductBtn', async () => {
   await loadAll();
 });
 
+// ---- Services (аренда, штрафы и пр. — продаются как товар, без остатка) ----
+function renderServices() {
+  const body = document.getElementById('servicesBody');
+  body.innerHTML = state.services.map(s => `
+    <tr>
+      <td>${escapeHtml(s.Name)}</td>
+      <td>${escapeHtml(s.Code)}</td>
+      <td>${escapeHtml(s.Unit)}</td>
+      <td>${formatMoney(s.Price)}</td>
+      <td class="actions">
+        <button class="btn" data-edit-service="${s.ID}">Изменить</button>
+        <button class="btn danger" data-delete-service="${s.ID}">Удалить</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function fillServiceForm(s) {
+  document.getElementById('serviceId').value = s.ID || '';
+  document.getElementById('serviceName').value = s.Name || '';
+  document.getElementById('serviceCode').value = s.Code || '';
+  document.getElementById('serviceUnit').value = s.Unit || 'шт';
+  document.getElementById('servicePrice').value = s.Price || 0;
+}
+
+document.getElementById('addServiceBtn').addEventListener('click', () => {
+  document.getElementById('serviceModalTitle').textContent = 'Новая услуга';
+  fillServiceForm({});
+  openModal('serviceModal');
+});
+
+document.getElementById('servicesBody').addEventListener('click', async (e) => {
+  const editId = e.target.dataset.editService;
+  const delId = e.target.dataset.deleteService;
+  if (editId) {
+    const s = state.services.find(x => x.ID === editId);
+    document.getElementById('serviceModalTitle').textContent = 'Изменить услугу';
+    fillServiceForm(s);
+    openModal('serviceModal');
+  } else if (delId) {
+    if (!confirm('Удалить услугу?')) return;
+    await api('deleteService', { id: delId });
+    await loadAll();
+  }
+});
+
+guardClick('saveServiceBtn', async () => {
+  const id = document.getElementById('serviceId').value;
+  const payload = {
+    id,
+    name: document.getElementById('serviceName').value.trim(),
+    code: document.getElementById('serviceCode').value.trim(),
+    unit: document.getElementById('serviceUnit').value.trim(),
+    price: document.getElementById('servicePrice').value
+  };
+  if (!payload.name) { alert('Укажите название'); return; }
+  await api(id ? 'updateService' : 'addService', payload);
+  closeModal('serviceModal');
+  await loadAll();
+});
+
 // ---- Contacts ----
 const typeLabels = { client: 'Клиент', supplier: 'Поставщик' };
 
@@ -285,7 +348,8 @@ document.getElementById('addOrderBtn').addEventListener('click', () => {
 // Shared factory for a table row with a searchable product picker (used by
 // both Orders and Sales item tables). priceFn picks the default price to fill
 // in when a product is selected (cost price for purchases, sale price for sales).
-function createProductPickerRow(containerId, priceFn, onChange) {
+function createProductPickerRow(containerId, priceFn, onChange, getItems) {
+  getItems = getItems || (() => state.products);
   const row = document.createElement('tr');
   row.innerHTML = `
     <td class="item-product-cell">
@@ -329,7 +393,7 @@ function createProductPickerRow(containerId, priceFn, onChange) {
     const q = query.trim().toLowerCase();
     if (!q) { suggestBox.hidden = true; return; }
     positionSuggestBox();
-    const matches = state.products.filter(p =>
+    const matches = getItems().filter(p =>
       String(p.Name || '').toLowerCase().includes(q) ||
       String(p.Code || '').toLowerCase().includes(q) ||
       String(p.Article || '').toLowerCase().includes(q)
@@ -342,7 +406,7 @@ function createProductPickerRow(containerId, priceFn, onChange) {
     suggestBox.innerHTML = matches.map((p, i) => `
       <div class="picker-suggestion" data-idx="${i}">
         <span>${escapeHtml(p.Name)}</span>
-        <span class="kind">${escapeHtml(p.Code || p.Article || '')} · ост. ${p.Quantity}</span>
+        <span class="kind">${escapeHtml(p.Code || p.Article || '')} · ${p.Quantity === undefined ? 'услуга' : 'ост. ' + p.Quantity}</span>
       </div>
     `).join('');
     suggestBox.hidden = false;
@@ -738,7 +802,7 @@ document.getElementById('salesBody').addEventListener('click', async (e) => {
 document.getElementById('salesShowBtn').addEventListener('click', renderSales);
 
 function addSaleItemRow() {
-  createProductPickerRow('saleItemsBody', p => p.Price, updateSaleTotal);
+  createProductPickerRow('saleItemsBody', p => p.Price, updateSaleTotal, () => state.products.concat(state.services));
 }
 
 function updateSaleTotal() {
@@ -787,7 +851,7 @@ guardClick('saveSaleBtn', async () => {
   const rows = document.querySelectorAll('#saleItemsBody tr');
   const items = Array.from(rows).map(row => {
     const productId = row.querySelector('.item-product-id').value;
-    const product = state.products.find(p => p.ID === productId);
+    const product = state.products.find(p => p.ID === productId) || state.services.find(s => s.ID === productId);
     return {
       productId,
       name: product ? product.Name : '',

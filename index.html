@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MoySkladLite</title>
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 <header class="topbar">
@@ -15,6 +15,7 @@
 
 <nav class="tabs">
   <button class="tab-btn active" data-tab="products">Товары</button>
+  <button class="tab-btn" data-tab="services">Услуги</button>
   <button class="tab-btn" data-tab="contacts">Контрагенты</button>
   <button class="tab-btn" data-tab="orders">Заказы</button>
   <button class="tab-btn" data-tab="sales">Продажи</button>
@@ -34,6 +35,17 @@
       <tbody id="productsBody"></tbody>
     </table>
     </div>
+  </section>
+
+  <section id="tab-services" class="tab-panel">
+    <div class="panel-head">
+      <h2>Услуги</h2>
+      <button class="btn primary" id="addServiceBtn">+ Добавить услугу</button>
+    </div>
+    <table class="data-table">
+      <thead><tr><th>Название</th><th>Код</th><th>Ед.</th><th>Цена продажи</th><th></th></tr></thead>
+      <tbody id="servicesBody"></tbody>
+    </table>
   </section>
 
   <section id="tab-contacts" class="tab-panel">
@@ -265,6 +277,24 @@
   </div>
 </div>
 
+<!-- Service modal -->
+<div class="modal" id="serviceModal">
+  <div class="modal-content">
+    <h3 id="serviceModalTitle">Услуга</h3>
+    <input type="hidden" id="serviceId">
+    <label>Название<input type="text" id="serviceName" required></label>
+    <div class="two-col">
+      <label>Код<input type="text" id="serviceCode"></label>
+      <label>Единица измерения<input type="text" id="serviceUnit" value="шт"></label>
+    </div>
+    <label>Цена продажи<input type="number" id="servicePrice" step="0.01" value="0"></label>
+    <div class="modal-actions">
+      <button class="btn" data-close="serviceModal">Отмена</button>
+      <button class="btn primary" id="saveServiceBtn">Сохранить</button>
+    </div>
+  </div>
+</div>
+
 <!-- Contact modal -->
 <div class="modal" id="contactModal">
   <div class="modal-content">
@@ -358,7 +388,7 @@
   </div>
 </div>
 
-<script src="config.js?v=6"></script>
-<script src="app.js?v=6"></script>
+<script src="config.js?v=7"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>

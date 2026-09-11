@@ -9,6 +9,7 @@ var INVENTORIES_HEADERS = ['ID', 'Date', 'Comment', 'Status', 'ItemsJSON'];
 var SALES_HEADERS = ['ID', 'Date', 'ItemsJSON', 'CashAmount', 'CardAmount', 'Discount', 'Total', 'Comment', 'Provider'];
 var PAYMENTS_HEADERS = ['ID', 'Date', 'Type', 'Category', 'Amount', 'Comment', 'RefId', 'RefLabel'];
 var HELD_HEADERS = ['ID', 'Date', 'ItemsJSON', 'Discount'];
+var SERVICES_HEADERS = ['ID', 'Name', 'Code', 'Unit', 'Price'];
 
 function getSheet(name, headers) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -40,6 +41,7 @@ function salesSheet() {
 }
 function paymentsSheet() { return getSheet('Payments', PAYMENTS_HEADERS); }
 function heldSheet() { return getSheet('Held', HELD_HEADERS); }
+function servicesSheet() { return getSheet('Services', SERVICES_HEADERS); }
 
 function sheetToObjects(sheet, headers) {
   var data = sheet.getDataRange().getValues();
@@ -106,6 +108,9 @@ function doPost(e) {
       case 'addHeld': result = addHeld(payload); break;
       case 'updateHeld': result = updateHeld(payload); break;
       case 'deleteHeld': result = deleteHeld(payload); break;
+      case 'addService': result = addService(payload); break;
+      case 'updateService': result = updateService(payload); break;
+      case 'deleteService': result = deleteService(payload); break;
       case 'getPnl': result = getPnl(payload); break;
       default: throw new Error('Unknown action: ' + action);
     }
@@ -137,7 +142,8 @@ function getAll() {
     h.Items = JSON.parse(h.ItemsJSON || '[]');
     return h;
   });
-  return { products: products, contacts: contacts, orders: orders, inventories: inventories, sales: sales, payments: payments, held: held };
+  var services = sheetToObjects(servicesSheet(), SERVICES_HEADERS);
+  return { products: products, contacts: contacts, orders: orders, inventories: inventories, sales: sales, payments: payments, held: held, services: services };
 }
 
 // ---- Products ----
@@ -215,6 +221,31 @@ function deleteContact(c) {
   if (row === -1) throw new Error('Контрагент не найден');
   sheet.deleteRow(row);
   return { id: c.id };
+}
+
+// ---- Services (аренда, штрафы и пр. — продаются как товар, но без остатка на складе) ----
+function addService(s) {
+  var sheet = servicesSheet();
+  var obj = { ID: newId(), Name: s.name, Code: s.code || '', Unit: s.unit || 'шт', Price: Number(s.price) || 0 };
+  sheet.appendRow(SERVICES_HEADERS.map(function (h) { return obj[h]; }));
+  return obj;
+}
+
+function updateService(s) {
+  var sheet = servicesSheet();
+  var row = findRowById(sheet, s.id);
+  if (row === -1) throw new Error('Услуга не найдена');
+  var obj = { ID: s.id, Name: s.name, Code: s.code || '', Unit: s.unit || 'шт', Price: Number(s.price) || 0 };
+  setRowByHeaders(sheet, SERVICES_HEADERS, row, obj);
+  return obj;
+}
+
+function deleteService(s) {
+  var sheet = servicesSheet();
+  var row = findRowById(sheet, s.id);
+  if (row === -1) throw new Error('Услуга не найдена');
+  sheet.deleteRow(row);
+  return { id: s.id };
 }
 
 // ---- Movements (stock history, used by Обороты and Остатки on-date) ----

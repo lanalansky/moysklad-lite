@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MoySkladLite</title>
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 <header class="topbar">
@@ -25,15 +25,30 @@
 
 <main>
   <section id="tab-products" class="tab-panel active">
-    <div class="panel-head">
-      <h2>Товары и остатки</h2>
-      <button class="btn primary" id="addProductBtn">+ Добавить товар</button>
-    </div>
-    <div class="table-scroll">
-    <table class="data-table">
-      <thead><tr><th>Название</th><th>Артикул</th><th>Код</th><th>Группа</th><th>Ед.</th><th>Закуп. цена</th><th>Мин. цена</th><th>Цена продажи</th><th>Остаток</th><th></th></tr></thead>
-      <tbody id="productsBody"></tbody>
-    </table>
+    <div class="products-layout">
+      <aside class="group-sidebar">
+        <div class="group-sidebar-head">
+          <h3>Группы товаров</h3>
+          <input type="text" id="groupTreeSearch" class="tree-search" placeholder="Поиск по группам…">
+        </div>
+        <div class="tree-scroll" id="groupTree"></div>
+      </aside>
+      <div class="products-main">
+        <div class="panel-head">
+          <h2>Товары и остатки</h2>
+          <div class="group-breadcrumb" id="groupBreadcrumb"></div>
+          <div class="panel-head-actions">
+            <input type="text" id="productNameSearch" class="name-search" placeholder="Наименование, код или артикул">
+            <button class="btn primary" id="addProductBtn">+ Добавить товар</button>
+          </div>
+        </div>
+        <div class="table-scroll">
+        <table class="data-table">
+          <thead><tr><th>Название</th><th>Артикул</th><th>Код</th><th>Группа</th><th>Ед.</th><th>Закуп. цена</th><th>Мин. цена</th><th>Цена продажи</th><th>Остаток</th><th></th></tr></thead>
+          <tbody id="productsBody"></tbody>
+        </table>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -388,7 +403,7 @@
   </div>
 </div>
 
-<script src="config.js?v=7"></script>
-<script src="app.js?v=7"></script>
+<script src="config.js?v=8"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>

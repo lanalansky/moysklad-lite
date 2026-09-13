@@ -1,4 +1,6 @@
 const state = { products: [], contacts: [], orders: [], inventories: [], sales: [], payments: [], services: [] };
+let selectedGroupPath = null; // null = "Товары и услуги" (без своей папки)
+let expandedGroups = new Set();
 
 const statusEl = document.getElementById('status');
 
@@ -62,6 +64,7 @@ async function loadAll() {
     state.sales = data.sales || [];
     state.payments = data.payments || [];
     state.services = data.services || [];
+    renderGroupTree();
     renderProducts();
     renderServices();
     renderContacts();
@@ -104,25 +107,151 @@ document.querySelectorAll('[data-close]').forEach(btn => {
 });
 
 // ---- Products ----
+
+// Builds a nested tree of group folders from products' "A/B/C" Group strings,
+// with a per-node item count that includes all descendants.
+function buildGroupTree() {
+  const root = { children: new Map() };
+  state.products.forEach(p => {
+    const group = (p.Group || '').trim();
+    if (!group) return;
+    let node = root;
+    const parts = group.split('/').map(s => s.trim()).filter(Boolean);
+    let pathAcc = [];
+    parts.forEach(part => {
+      pathAcc.push(part);
+      const path = pathAcc.join('/');
+      if (!node.children.has(part)) {
+        node.children.set(part, { name: part, path, count: 0, children: new Map() });
+      }
+      node = node.children.get(part);
+      node.count++;
+    });
+  });
+  const toList = (node) => [...node.children.values()]
+    .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+    .map(n => ({ name: n.name, path: n.path, count: n.count, children: toList(n) }));
+  return toList(root);
+}
+
+function groupPathMatches(productGroup, selPath) {
+  if (selPath === null) return false;
+  if (!productGroup) return false;
+  return productGroup === selPath || productGroup.startsWith(selPath + '/');
+}
+
+function renderTreeNode(node, depth) {
+  const hasChildren = node.children.length > 0;
+  const isExpanded = expandedGroups.has(node.path);
+  const isActive = selectedGroupPath === node.path;
+  let html = `
+    <div class="tree-row ${isActive ? 'active' : ''}" style="padding-left:${8 + depth * 16}px" data-path="${escapeHtml(node.path)}" data-toggle="${hasChildren ? '1' : '0'}">
+      <span class="tree-toggle ${hasChildren ? (isExpanded ? 'expanded' : '') : 'leaf'}">▶</span>
+      <svg class="tree-icon" viewBox="0 0 20 20" fill="none"><path d="M3 6.5C3 5.67 3.67 5 4.5 5H8l1.5 2H15.5c.83 0 1.5.67 1.5 1.5v6c0 .83-.67 1.5-1.5 1.5h-11C3.67 16 3 15.33 3 14.5v-8Z" stroke="currentColor" stroke-width="1.3"/></svg>
+      <span class="tree-label">${escapeHtml(node.name)}</span>
+      <span class="tree-count">${node.count}</span>
+    </div>
+  `;
+  if (hasChildren) {
+    html += `<div class="tree-children ${isExpanded ? 'open' : ''}" data-parent="${escapeHtml(node.path)}">`;
+    node.children.forEach(c => { html += renderTreeNode(c, depth + 1); });
+    html += '</div>';
+  }
+  return html;
+}
+
+function renderGroupTree() {
+  const filterText = (document.getElementById('groupTreeSearch').value || '').trim().toLowerCase();
+  let tree = buildGroupTree();
+  if (filterText) {
+    const filterNode = (node) => {
+      const children = node.children.map(filterNode).filter(Boolean);
+      const selfMatch = node.name.toLowerCase().includes(filterText);
+      if (selfMatch || children.length) {
+        if (children.length) expandedGroups.add(node.path);
+        return { ...node, children };
+      }
+      return null;
+    };
+    tree = tree.map(filterNode).filter(Boolean);
+  }
+  const rootCount = state.products.filter(p => !p.Group).length + state.services.length;
+  let html = `
+    <div class="tree-row ${selectedGroupPath === null ? 'active' : ''}" data-path="">
+      <span class="tree-toggle leaf"></span>
+      <svg class="tree-icon" viewBox="0 0 20 20" fill="none"><path d="M3 6.5C3 5.67 3.67 5 4.5 5H8l1.5 2H15.5c.83 0 1.5.67 1.5 1.5v6c0 .83-.67 1.5-1.5 1.5h-11C3.67 16 3 15.33 3 14.5v-8Z" stroke="currentColor" stroke-width="1.3"/></svg>
+      <span class="tree-label">Товары и услуги</span>
+      <span class="tree-count">${rootCount}</span>
+    </div>
+  `;
+  tree.forEach(n => { html += renderTreeNode(n, 0); });
+  document.getElementById('groupTree').innerHTML = html;
+}
+
+document.getElementById('groupTree').addEventListener('click', (e) => {
+  const row = e.target.closest('.tree-row');
+  if (!row) return;
+  const path = row.dataset.path;
+  if (row.dataset.toggle === '1' && e.target.classList.contains('tree-toggle')) {
+    if (expandedGroups.has(path)) expandedGroups.delete(path); else expandedGroups.add(path);
+    renderGroupTree();
+    return;
+  }
+  selectedGroupPath = path === '' ? null : path;
+  if (row.dataset.toggle === '1') expandedGroups.add(path);
+  renderGroupTree();
+  renderProducts();
+});
+
+document.getElementById('groupTreeSearch').addEventListener('input', renderGroupTree);
+document.getElementById('productNameSearch').addEventListener('input', renderProducts);
+
 function renderProducts() {
   const body = document.getElementById('productsBody');
-  body.innerHTML = state.products.map(p => `
-    <tr>
-      <td>${escapeHtml(p.Name)}</td>
-      <td>${escapeHtml(p.Article)}</td>
-      <td>${escapeHtml(p.Code)}</td>
-      <td>${escapeHtml(p.Group)}</td>
-      <td>${escapeHtml(p.Unit)}</td>
-      <td>${formatMoney(p.CostPrice)}</td>
-      <td>${formatMoney(p.MinPrice)}</td>
-      <td>${formatMoney(p.Price)}</td>
-      <td class="${Number(p.Quantity) <= 0 ? 'low-stock' : ''}">${p.Quantity}</td>
-      <td class="actions">
-        <button class="btn" data-edit-product="${p.ID}">Изменить</button>
-        <button class="btn danger" data-delete-product="${p.ID}">Удалить</button>
-      </td>
-    </tr>
-  `).join('');
+  const nameFilter = (document.getElementById('productNameSearch').value || '').trim().toLowerCase();
+
+  let items;
+  if (selectedGroupPath === null) {
+    items = state.products.filter(p => !p.Group).map(p => ({ ...p, isService: false }))
+      .concat(state.services.map(s => ({ ...s, isService: true })));
+  } else {
+    items = state.products.filter(p => groupPathMatches(p.Group, selectedGroupPath)).map(p => ({ ...p, isService: false }));
+  }
+  if (nameFilter) {
+    items = items.filter(p =>
+      (p.Name || '').toLowerCase().includes(nameFilter) ||
+      (p.Code || '').toLowerCase().includes(nameFilter) ||
+      (p.Article || '').toLowerCase().includes(nameFilter)
+    );
+  }
+
+  if (!items.length) {
+    body.innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:32px;">Ничего не найдено</td></tr>`;
+  } else {
+    body.innerHTML = items.map(p => `
+      <tr>
+        <td>${escapeHtml(p.Name)}${p.isService ? '<span class="service-badge">услуга</span>' : ''}</td>
+        <td>${escapeHtml(p.Article)}</td>
+        <td>${escapeHtml(p.Code)}</td>
+        <td>${escapeHtml(p.Group)}</td>
+        <td>${escapeHtml(p.Unit)}</td>
+        <td>${p.isService ? '' : formatMoney(p.CostPrice)}</td>
+        <td>${p.isService ? '' : formatMoney(p.MinPrice)}</td>
+        <td>${formatMoney(p.Price)}</td>
+        <td class="${!p.isService && Number(p.Quantity) <= 0 ? 'low-stock' : ''}">${p.isService ? '—' : p.Quantity}</td>
+        <td class="actions">
+          ${p.isService
+            ? `<button class="btn" data-edit-service="${p.ID}">Изменить</button><button class="btn danger" data-delete-service="${p.ID}">Удалить</button>`
+            : `<button class="btn" data-edit-product="${p.ID}">Изменить</button><button class="btn danger" data-delete-product="${p.ID}">Удалить</button>`}
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  const bc = document.getElementById('groupBreadcrumb');
+  bc.innerHTML = selectedGroupPath === null
+    ? `<b>Товары и услуги</b> · ${items.length}`
+    : `${escapeHtml(selectedGroupPath.split('/').join(' / '))} · <b>${items.length}</b>`;
 }
 
 function fillProductForm(p) {
@@ -140,13 +269,15 @@ function fillProductForm(p) {
 
 document.getElementById('addProductBtn').addEventListener('click', () => {
   document.getElementById('productModalTitle').textContent = 'Новый товар';
-  fillProductForm({});
+  fillProductForm({ Group: selectedGroupPath || '' });
   openModal('productModal');
 });
 
 document.getElementById('productsBody').addEventListener('click', async (e) => {
   const editId = e.target.dataset.editProduct;
   const delId = e.target.dataset.deleteProduct;
+  const editServiceId = e.target.dataset.editService;
+  const delServiceId = e.target.dataset.deleteService;
   if (editId) {
     const p = state.products.find(x => x.ID === editId);
     document.getElementById('productModalTitle').textContent = 'Изменить товар';
@@ -155,6 +286,15 @@ document.getElementById('productsBody').addEventListener('click', async (e) => {
   } else if (delId) {
     if (!confirm('Удалить товар?')) return;
     await api('deleteProduct', { id: delId });
+    await loadAll();
+  } else if (editServiceId) {
+    const s = state.services.find(x => x.ID === editServiceId);
+    document.getElementById('serviceModalTitle').textContent = 'Изменить услугу';
+    fillServiceForm(s);
+    openModal('serviceModal');
+  } else if (delServiceId) {
+    if (!confirm('Удалить услугу?')) return;
+    await api('deleteService', { id: delServiceId });
     await loadAll();
   }
 });

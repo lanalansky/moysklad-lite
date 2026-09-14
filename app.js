@@ -17,6 +17,10 @@ async function api(action, payload) {
       const text = await res.text();
       const json = JSON.parse(text);
       if (!json.ok) throw new Error(json.error || 'Unknown API error');
+      // A rare Apps Script cold-start hiccup can return ok:true with no
+      // payload attached; treat that as retryable instead of crashing
+      // downstream on e.g. "data.products is undefined".
+      if (json.data === undefined || json.data === null) throw new Error('Пустой ответ сервера');
       return json.data;
     } catch (err) {
       lastErr = err;
@@ -57,9 +61,9 @@ async function loadAll() {
   setCreateButtonsEnabled(false);
   try {
     const data = await api('getAll');
-    state.products = data.products;
-    state.contacts = data.contacts;
-    state.orders = data.orders;
+    state.products = data.products || [];
+    state.contacts = data.contacts || [];
+    state.orders = data.orders || [];
     state.inventories = data.inventories || [];
     state.sales = data.sales || [];
     state.payments = data.payments || [];

@@ -500,6 +500,16 @@ function renderReport() {
   document.getElementById('repCard').textContent = 'Безнал. ' + money(card);
   document.getElementById('repSales').textContent = todaysSales.length + ' · ' + money(revenue);
 
+  // Running cash-on-hand balance, unlike "Выручка сегодня" this never resets:
+  // all-time cash from sales + every Внесение через кассу − every Выплата через
+  // кассу. Deliberately excludes other Payments categories (e.g. Аренда entered
+  // from the admin site) since those aren't cash physically moved through this
+  // till.
+  const allCashFromSales = state.sales.reduce((s, x) => s + Number(x.CashAmount || 0), 0);
+  const cashIn = state.payments.filter(p => p.Type === 'income' && p.Category === 'Внесение').reduce((s, p) => s + Number(p.Amount || 0), 0);
+  const cashOut = state.payments.filter(p => p.Type === 'expense' && p.Category === 'Выплата').reduce((s, p) => s + Number(p.Amount || 0), 0);
+  document.getElementById('repCashBalance').textContent = money(allCashFromSales + cashIn - cashOut);
+
   const pendingSum = state.held.reduce((s, h) => s + heldSum(h), 0);
   document.getElementById('repPending').textContent = state.held.length + ' · ' + money(pendingSum);
   document.getElementById('repTotal').textContent = money(revenue);

@@ -226,6 +226,13 @@ body{
 .shift-hero .l{ font-size:12px; opacity:.85; font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
 .shift-hero .v{ font-size:30px; font-weight:800; margin-top:4px; }
 .shift-hero .sub{ font-size:12.5px; opacity:.9; margin-top:10px; display:flex; gap:14px; flex-wrap:wrap; }
+.cash-balance-card{
+  background:var(--surface); border:1px solid var(--border); border-radius:14px;
+  padding:14px 16px; margin:0 0 16px; display:flex; justify-content:space-between; align-items:center;
+}
+.cash-balance-card .l{ font-size:12.5px; color:var(--muted); font-weight:600; }
+.cash-balance-card .v{ font-size:18px; font-weight:800; color:var(--teal-dark); }
+
 .shift-actions{ display:flex; gap:10px; margin-bottom:16px; }
 .shift-actions button{ flex:1; border-radius:12px; padding:13px 8px; font-size:12.5px; font-weight:700; border:1px solid var(--border); background:var(--surface); color:var(--text); font-family:inherit; }
 .stat-list{ background:var(--surface); border:1px solid var(--border); border-radius:14px; overflow:hidden; margin-bottom:16px; }

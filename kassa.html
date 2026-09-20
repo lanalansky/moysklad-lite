@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Касса продавца — MoySkladLite</title>
-<link rel="manifest" href="manifest.json?v=7">
+<link rel="manifest" href="manifest.json?v=8">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <meta name="theme-color" content="#0ea59d">
@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Касса">
-<link rel="stylesheet" href="kassa.css?v=7">
+<link rel="stylesheet" href="kassa.css?v=8">
 </head>
 <body>
 
@@ -147,6 +147,11 @@
         <div class="sub"><span id="repCash">Нал. 0,00 ₽</span><span id="repCard">Безнал. 0,00 ₽</span></div>
       </div>
 
+      <div class="cash-balance-card">
+        <div class="l">Остаток наличных в кассе</div>
+        <div class="v" id="repCashBalance">0,00 ₽</div>
+      </div>
+
       <div class="shift-actions">
         <button id="cashInBtn">↓ Внести деньги</button>
         <button id="cashOutBtn">↑ Выплатить деньги</button>
@@ -248,7 +253,7 @@
 
 </div>
 
-<script src="config.js?v=7"></script>
-<script src="kassa.js?v=7"></script>
+<script src="config.js?v=8"></script>
+<script src="kassa.js?v=8"></script>
 </body>
 </html>

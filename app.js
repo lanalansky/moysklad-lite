@@ -531,9 +531,13 @@ guardClick('saveRepackRecipeBtn', async () => {
   if (!boxProductId || !pieceProductId) { alert('Выберите оба товара из списка подсказок'); return; }
   if (boxProductId === pieceProductId) { alert('Товар-источник и товар-результат не могут совпадать'); return; }
   if (packSize < 1) { alert('Укажите, сколько штук в коробе'); return; }
-  await api('addRepackRecipe', { boxProductId, pieceProductId, packSize });
-  closeModal('repackRecipeModal');
-  await loadAll();
+  try {
+    await api('addRepackRecipe', { boxProductId, pieceProductId, packSize });
+    closeModal('repackRecipeModal');
+    await loadAll();
+  } catch (err) {
+    setStatus('Ошибка: ' + err.message, true);
+  }
 });
 
 // ---- Contacts ----

@@ -51,7 +51,7 @@ function guardClick(id, handler) {
   });
 }
 
-const createButtonIds = ['addProductBtn', 'addServiceBtn', 'addContactBtn', 'addOrderBtn', 'addSaleBtn'];
+const createButtonIds = ['addProductBtn', 'addServiceBtn', 'addContactBtn', 'addOrderBtn', 'addSaleBtn', 'addRepackRecipeBtn'];
 function setCreateButtonsEnabled(enabled) {
   createButtonIds.forEach(id => { document.getElementById(id).disabled = !enabled; });
 }

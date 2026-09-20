@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MoySkladLite</title>
-<link rel="stylesheet" href="style.css?v=9">
+<link rel="stylesheet" href="style.css?v=10">
 </head>
 <body>
 <header class="topbar">
@@ -20,6 +20,7 @@
   <button class="tab-btn" data-tab="orders">Заказы</button>
   <button class="tab-btn" data-tab="sales">Продажи</button>
   <button class="tab-btn" data-tab="money">Деньги</button>
+  <button class="tab-btn" data-tab="repack">Пересорт</button>
   <button class="tab-btn" data-tab="warehouse">Склад</button>
 </nav>
 
@@ -61,6 +62,17 @@
       <thead><tr><th>Название</th><th>Код</th><th>Ед.</th><th>Цена продажи</th><th></th></tr></thead>
       <tbody id="servicesBody"></tbody>
     </table>
+  </section>
+
+  <section id="tab-repack" class="tab-panel">
+    <div class="panel-head">
+      <div>
+        <h2>Пересорт товара</h2>
+        <p class="hint">Разбор коробки на поштучные единицы того же вида</p>
+      </div>
+      <button class="btn primary" id="addRepackRecipeBtn">+ Новая пара пересорта</button>
+    </div>
+    <div class="recipe-grid" id="repackGrid"></div>
   </section>
 
   <section id="tab-contacts" class="tab-panel">
@@ -310,6 +322,26 @@
   </div>
 </div>
 
+<!-- Repack recipe modal -->
+<div class="modal" id="repackRecipeModal">
+  <div class="modal-content">
+    <h3>Новая пара пересорта</h3>
+    <input type="hidden" id="repackBoxId">
+    <label>Товар-источник (короб)
+      <input type="text" id="repackBoxSearch" placeholder="Название, код или артикул…" autocomplete="off">
+    </label>
+    <input type="hidden" id="repackPieceId">
+    <label>Товар-результат (поштучно)
+      <input type="text" id="repackPieceSearch" placeholder="Название, код или артикул…" autocomplete="off">
+    </label>
+    <label>Штук в коробе<input type="number" id="repackPackSize" value="20" min="1" step="1"></label>
+    <div class="modal-actions">
+      <button class="btn" data-close="repackRecipeModal">Отмена</button>
+      <button class="btn primary" id="saveRepackRecipeBtn">Сохранить пару</button>
+    </div>
+  </div>
+</div>
+
 <!-- Contact modal -->
 <div class="modal" id="contactModal">
   <div class="modal-content">
@@ -403,7 +435,7 @@
   </div>
 </div>
 
-<script src="config.js?v=9"></script>
-<script src="app.js?v=9"></script>
+<script src="config.js?v=10"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>

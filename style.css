@@ -8,6 +8,8 @@
   --primary-dark: #1d4ed8;
   --primary-tint: #eaf0fe;
   --danger: #dc2626;
+  --success: #16a34a;
+  --success-tint: #e8f8ee;
 }
 
 * { box-sizing: border-box; }
@@ -490,6 +492,52 @@ main { padding: 24px; }
 .turnover-table .cat-row td { font-weight: 700; background: var(--bg); }
 .turnover-table .in-cell { color: #1a7f37; }
 .turnover-table .out-cell { color: #b3261e; }
+
+/* ---- Repack (короб -> поштучно) ---- */
+.panel-head h2 + .hint, .panel-head p.hint { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+
+.recipe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+
+.recipe-card {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  padding: 16px; display: flex; flex-direction: column; gap: 10px; position: relative;
+}
+.recipe-card.done { border-color: var(--success); }
+.recipe-card.done::after {
+  content: "✓ Проведено"; position: absolute; top: 12px; right: 12px;
+  background: var(--success-tint); color: var(--success); font-size: 11.5px; font-weight: 600;
+  padding: 3px 8px; border-radius: 5px;
+}
+.recipe-row { display: flex; align-items: center; gap: 10px; }
+.recipe-icon {
+  flex: none; width: 32px; height: 32px; border-radius: 8px; display: flex;
+  align-items: center; justify-content: center; background: var(--primary-tint);
+  color: var(--primary-dark); font-size: 15px;
+}
+.recipe-name { font-weight: 600; font-size: 13.5px; line-height: 1.3; }
+.recipe-stock { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.recipe-stock.low { color: var(--danger); }
+.recipe-arrow { display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--muted); font-size: 12px; }
+.recipe-arrow .line { flex: 1; height: 1px; background: var(--border); }
+.pack-badge { background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 2px 8px; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.recipe-action { display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--border); padding-top: 12px; }
+.recipe-action label { font-size: 12.5px; color: var(--muted); white-space: nowrap; margin: 0; }
+.recipe-action input { width: 56px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; text-align: center; font-size: 14px; }
+.recipe-action .btn { flex: 1; }
+.recipe-action .will-give { font-size: 12px; color: var(--muted); margin-left: auto; white-space: nowrap; }
+.recipe-remove {
+  position: absolute; top: 10px; right: 10px; border: none; background: none;
+  color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; padding: 2px 4px;
+}
+.recipe-remove:hover { color: var(--danger); }
+.recipe-card.done .recipe-remove { display: none; }
+
+.add-recipe-card {
+  border: 1.5px dashed var(--border); background: transparent; display: flex;
+  align-items: center; justify-content: center; color: var(--muted); cursor: pointer;
+  min-height: 150px; border-radius: 10px; font-size: 14px;
+}
+.add-recipe-card:hover { border-color: var(--primary); color: var(--primary); }
 
 .stock-table-cat td { font-weight: 700; background: var(--bg); }
 

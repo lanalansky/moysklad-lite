@@ -1,4 +1,4 @@
-const state = { products: [], contacts: [], orders: [], inventories: [], sales: [], payments: [], services: [] };
+const state = { products: [], contacts: [], orders: [], inventories: [], sales: [], payments: [], services: [], repackRecipes: [] };
 let selectedGroupPath = null; // null = "Товары и услуги" (без своей папки)
 let expandedGroups = new Set();
 
@@ -68,6 +68,7 @@ async function loadAll() {
     state.sales = data.sales || [];
     state.payments = data.payments || [];
     state.services = data.services || [];
+    state.repackRecipes = data.repackRecipes || [];
     renderGroupTree();
     renderProducts();
     renderServices();
@@ -77,6 +78,7 @@ async function loadAll() {
     renderStock();
     renderSales();
     renderPayments();
+    renderRepack();
     setStatus('Обновлено: ' + new Date().toLocaleTimeString());
   } catch (err) {
     setStatus('Ошибка: ' + err.message, true);
@@ -383,6 +385,158 @@ guardClick('saveServiceBtn', async () => {
   if (!payload.name) { alert('Укажите название'); return; }
   await api(id ? 'updateService' : 'addService', payload);
   closeModal('serviceModal');
+  await loadAll();
+});
+
+// ---- Repack (короб -> поштучно) ----
+function renderRepack() {
+  const grid = document.getElementById('repackGrid');
+  const cards = state.repackRecipes.map(r => {
+    const box = state.products.find(p => p.ID === r.BoxProductId);
+    const piece = state.products.find(p => p.ID === r.PieceProductId);
+    if (!box || !piece) return '';
+    const packSize = Number(r.PackSize) || 1;
+    const boxStock = Number(box.Quantity) || 0;
+    return `
+      <div class="recipe-card" data-recipe-id="${r.ID}" data-pack-size="${packSize}" data-max="${boxStock}">
+        <button class="recipe-remove" data-remove-recipe="${r.ID}" title="Удалить пару">×</button>
+        <div class="recipe-row">
+          <div class="recipe-icon">📦</div>
+          <div>
+            <div class="recipe-name">${escapeHtml(box.Name)}</div>
+            <div class="recipe-stock ${boxStock <= 0 ? 'low' : ''}">на складе: ${boxStock} кор.</div>
+          </div>
+        </div>
+        <div class="recipe-arrow"><div class="line"></div><span class="pack-badge">1 короб = ${packSize} шт</span><div class="line"></div></div>
+        <div class="recipe-row">
+          <div class="recipe-icon">🧷</div>
+          <div>
+            <div class="recipe-name">${escapeHtml(piece.Name)}</div>
+            <div class="recipe-stock">на складе: ${Number(piece.Quantity) || 0} шт</div>
+          </div>
+        </div>
+        <div class="recipe-action">
+          <label>Коробов:</label>
+          <input type="number" class="repack-qty" min="1" max="${boxStock}" value="1" ${boxStock < 1 ? 'disabled' : ''}>
+          <span class="will-give">даст <b class="repack-will-give">${Math.min(1, boxStock) * packSize}</b> шт</span>
+          <button class="btn primary" data-repack-run="${r.ID}" ${boxStock < 1 ? 'disabled' : ''}>Провести</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  grid.innerHTML = cards + `<div class="add-recipe-card" id="repackAddCard">+ Новая пара пересорта</div>`;
+
+  grid.querySelectorAll('.recipe-card').forEach(card => {
+    const packSize = Number(card.dataset.packSize);
+    const qtyInput = card.querySelector('.repack-qty');
+    const willGive = card.querySelector('.repack-will-give');
+    qtyInput?.addEventListener('input', () => {
+      willGive.textContent = (Number(qtyInput.value) || 0) * packSize;
+    });
+  });
+  document.getElementById('repackAddCard').addEventListener('click', openRepackRecipeModal);
+}
+
+document.getElementById('repackGrid').addEventListener('click', async (e) => {
+  const runId = e.target.dataset.repackRun;
+  const removeId = e.target.dataset.removeRecipe;
+  if (runId) {
+    const card = e.target.closest('.recipe-card');
+    const qty = Number(card.querySelector('.repack-qty').value) || 0;
+    if (qty < 1) return;
+    e.target.disabled = true;
+    try {
+      await api('repackExecute', { recipeId: runId, boxCount: qty });
+      card.classList.add('done');
+      setStatus('Пересорт проведён');
+      await loadAll();
+    } catch (err) {
+      setStatus('Ошибка: ' + err.message, true);
+      e.target.disabled = false;
+    }
+  } else if (removeId) {
+    if (!confirm('Удалить эту пару пересорта? Остатки товаров это не изменит.')) return;
+    await api('deleteRepackRecipe', { id: removeId });
+    await loadAll();
+  }
+});
+
+document.getElementById('addRepackRecipeBtn').addEventListener('click', openRepackRecipeModal);
+
+function openRepackRecipeModal() {
+  document.getElementById('repackBoxId').value = '';
+  document.getElementById('repackBoxSearch').value = '';
+  document.getElementById('repackPieceId').value = '';
+  document.getElementById('repackPieceSearch').value = '';
+  document.getElementById('repackPackSize').value = 20;
+  openModal('repackRecipeModal');
+}
+
+// Standalone search-and-pick input (not tied to a table row, unlike
+// createProductPickerRow) for the two product fields in the recipe modal.
+function attachProductSearch(searchInput, idInput) {
+  const suggestBox = document.createElement('div');
+  suggestBox.className = 'picker-suggestions';
+  suggestBox.hidden = true;
+  document.body.appendChild(suggestBox);
+
+  function positionSuggestBox() {
+    const rect = searchInput.getBoundingClientRect();
+    suggestBox.style.position = 'fixed';
+    suggestBox.style.top = (rect.bottom + 4) + 'px';
+    suggestBox.style.left = rect.left + 'px';
+    suggestBox.style.width = rect.width + 'px';
+  }
+
+  function showSuggestions(query) {
+    const q = query.trim().toLowerCase();
+    if (!q) { suggestBox.hidden = true; return; }
+    positionSuggestBox();
+    const matches = state.products.filter(p =>
+      String(p.Name || '').toLowerCase().includes(q) ||
+      String(p.Code || '').toLowerCase().includes(q) ||
+      String(p.Article || '').toLowerCase().includes(q)
+    ).slice(0, 10);
+    if (!matches.length) {
+      suggestBox.innerHTML = '<div class="picker-suggestion" style="color:var(--muted);">Не найдено</div>';
+      suggestBox.hidden = false;
+      return;
+    }
+    suggestBox.innerHTML = matches.map((p, i) => `
+      <div class="picker-suggestion" data-idx="${i}">
+        <span>${escapeHtml(p.Name)}</span>
+        <span class="kind">${escapeHtml(p.Code || p.Article || '')} · ост. ${p.Quantity}</span>
+      </div>
+    `).join('');
+    suggestBox.hidden = false;
+    suggestBox.querySelectorAll('.picker-suggestion[data-idx]').forEach((el, i) => {
+      el.addEventListener('click', () => {
+        idInput.value = matches[i].ID;
+        searchInput.value = matches[i].Name;
+        suggestBox.hidden = true;
+      });
+    });
+  }
+
+  searchInput.addEventListener('input', () => { idInput.value = ''; showSuggestions(searchInput.value); });
+  searchInput.addEventListener('focus', () => { if (searchInput.value) showSuggestions(searchInput.value); });
+  document.addEventListener('click', (e) => {
+    if (e.target !== searchInput && !suggestBox.contains(e.target)) suggestBox.hidden = true;
+  });
+}
+
+attachProductSearch(document.getElementById('repackBoxSearch'), document.getElementById('repackBoxId'));
+attachProductSearch(document.getElementById('repackPieceSearch'), document.getElementById('repackPieceId'));
+
+guardClick('saveRepackRecipeBtn', async () => {
+  const boxProductId = document.getElementById('repackBoxId').value;
+  const pieceProductId = document.getElementById('repackPieceId').value;
+  const packSize = Number(document.getElementById('repackPackSize').value) || 0;
+  if (!boxProductId || !pieceProductId) { alert('Выберите оба товара из списка подсказок'); return; }
+  if (boxProductId === pieceProductId) { alert('Товар-источник и товар-результат не могут совпадать'); return; }
+  if (packSize < 1) { alert('Укажите, сколько штук в коробе'); return; }
+  await api('addRepackRecipe', { boxProductId, pieceProductId, packSize });
+  closeModal('repackRecipeModal');
   await loadAll();
 });
 

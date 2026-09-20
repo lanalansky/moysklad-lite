@@ -10,6 +10,7 @@ var SALES_HEADERS = ['ID', 'Date', 'ItemsJSON', 'CashAmount', 'CardAmount', 'Dis
 var PAYMENTS_HEADERS = ['ID', 'Date', 'Type', 'Category', 'Amount', 'Comment', 'RefId', 'RefLabel'];
 var HELD_HEADERS = ['ID', 'Date', 'ItemsJSON', 'Discount'];
 var SERVICES_HEADERS = ['ID', 'Name', 'Code', 'Unit', 'Price'];
+var REPACK_RECIPES_HEADERS = ['ID', 'BoxProductId', 'PieceProductId', 'PackSize'];
 
 function getSheet(name, headers) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -42,6 +43,7 @@ function salesSheet() {
 function paymentsSheet() { return getSheet('Payments', PAYMENTS_HEADERS); }
 function heldSheet() { return getSheet('Held', HELD_HEADERS); }
 function servicesSheet() { return getSheet('Services', SERVICES_HEADERS); }
+function repackRecipesSheet() { return getSheet('RepackRecipes', REPACK_RECIPES_HEADERS); }
 
 function sheetToObjects(sheet, headers) {
   var data = sheet.getDataRange().getValues();
@@ -111,6 +113,9 @@ function doPost(e) {
       case 'addService': result = addService(payload); break;
       case 'updateService': result = updateService(payload); break;
       case 'deleteService': result = deleteService(payload); break;
+      case 'addRepackRecipe': result = addRepackRecipe(payload); break;
+      case 'deleteRepackRecipe': result = deleteRepackRecipe(payload); break;
+      case 'repackExecute': result = repackExecute(payload); break;
       case 'getPnl': result = getPnl(payload); break;
       default: throw new Error('Unknown action: ' + action);
     }
@@ -143,7 +148,8 @@ function getAll() {
     return h;
   });
   var services = sheetToObjects(servicesSheet(), SERVICES_HEADERS);
-  return { products: products, contacts: contacts, orders: orders, inventories: inventories, sales: sales, payments: payments, held: held, services: services };
+  var repackRecipes = sheetToObjects(repackRecipesSheet(), REPACK_RECIPES_HEADERS);
+  return { products: products, contacts: contacts, orders: orders, inventories: inventories, sales: sales, payments: payments, held: held, services: services, repackRecipes: repackRecipes };
 }
 
 // ---- Products ----
@@ -246,6 +252,79 @@ function deleteService(s) {
   if (row === -1) throw new Error('Услуга не найдена');
   sheet.deleteRow(row);
   return { id: s.id };
+}
+
+// ---- Repack recipes (break a box of N pieces into individually-sold units,
+// e.g. a 20-pack of cartridges -> single поштучно cartridges of the same kind) ----
+function addRepackRecipe(p) {
+  var sheet = repackRecipesSheet();
+  var obj = { ID: newId(), BoxProductId: p.boxProductId, PieceProductId: p.pieceProductId, PackSize: Number(p.packSize) || 1 };
+  sheet.appendRow(REPACK_RECIPES_HEADERS.map(function (h) { return obj[h]; }));
+  return obj;
+}
+
+function deleteRepackRecipe(p) {
+  var sheet = repackRecipesSheet();
+  var row = findRowById(sheet, p.id);
+  if (row === -1) throw new Error('Пара пересорта не найдена');
+  sheet.deleteRow(row);
+  return { id: p.id };
+}
+
+// Converts boxCount boxes into pieces: decreases the box's stock, increases the
+// piece's stock by boxCount*PackSize, and gives those new pieces the box's own
+// already-landed CostPrice (which includes delivery) spread over PackSize,
+// blended into the piece's existing stock the same weighted-average way a
+// purchase order blends cost in applyStockDelta.
+function repackExecute(p) {
+  var recipeSheet = repackRecipesSheet();
+  var recipeRow = findRowById(recipeSheet, p.recipeId);
+  if (recipeRow === -1) throw new Error('Пара пересорта не найдена');
+  var recipeData = recipeSheet.getRange(recipeRow, 1, 1, REPACK_RECIPES_HEADERS.length).getValues()[0];
+  var recipe = {};
+  REPACK_RECIPES_HEADERS.forEach(function (h, i) { recipe[h] = recipeData[i]; });
+
+  var boxCount = Number(p.boxCount) || 0;
+  if (boxCount <= 0) throw new Error('Укажите количество коробов');
+  var packSize = Number(recipe.PackSize) || 1;
+
+  var productsSht = productsSheet();
+  var qtyCol = PRODUCTS_HEADERS.indexOf('Quantity') + 1;
+  var costCol = PRODUCTS_HEADERS.indexOf('CostPrice') + 1;
+  var nameCol = PRODUCTS_HEADERS.indexOf('Name') + 1;
+
+  var boxRow = findRowById(productsSht, recipe.BoxProductId);
+  if (boxRow === -1) throw new Error('Товар-короб не найден');
+  var pieceRow = findRowById(productsSht, recipe.PieceProductId);
+  if (pieceRow === -1) throw new Error('Поштучный товар не найден');
+
+  var boxQty = Number(productsSht.getRange(boxRow, qtyCol).getValue());
+  if (boxQty < boxCount) throw new Error('На складе недостаточно коробов (доступно: ' + boxQty + ')');
+  var boxCost = Number(productsSht.getRange(boxRow, costCol).getValue()) || 0;
+  var boxName = productsSht.getRange(boxRow, nameCol).getValue();
+
+  var pieceQty = Number(productsSht.getRange(pieceRow, qtyCol).getValue());
+  var pieceCost = Number(productsSht.getRange(pieceRow, costCol).getValue()) || 0;
+  var pieceName = productsSht.getRange(pieceRow, nameCol).getValue();
+
+  var gainedQty = boxCount * packSize;
+  var costPerPiece = boxCost / packSize;
+  var newPieceQtyTotal = pieceQty + gainedQty;
+  var newPieceCost = newPieceQtyTotal > 0
+    ? ((pieceQty * pieceCost) + (gainedQty * costPerPiece)) / newPieceQtyTotal
+    : costPerPiece;
+
+  productsSht.getRange(boxRow, qtyCol).setValue(boxQty - boxCount);
+  productsSht.getRange(pieceRow, qtyCol).setValue(newPieceQtyTotal);
+  productsSht.getRange(pieceRow, costCol).setValue(newPieceCost);
+
+  logMovement(recipe.BoxProductId, boxName, -boxCount, 'repack', recipe.ID, 'Пересорт → ' + pieceName);
+  logMovement(recipe.PieceProductId, pieceName, gainedQty, 'repack', recipe.ID, 'Пересорт ← ' + boxName);
+
+  return {
+    box: { id: recipe.BoxProductId, quantity: boxQty - boxCount },
+    piece: { id: recipe.PieceProductId, quantity: newPieceQtyTotal, costPrice: newPieceCost }
+  };
 }
 
 // ---- Movements (stock history, used by Обороты and Остатки on-date) ----

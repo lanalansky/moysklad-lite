@@ -116,7 +116,7 @@ function renderCatalog(filter) {
     const isService = p.Quantity === undefined;
     const inCart = !!cart[p.ID];
     const controls = inCart
-      ? `<div class="qty-stepper"><button data-dec="${p.ID}">−</button><span class="qv">${cart[p.ID].qty}</span><button data-inc="${p.ID}">+</button></div>`
+      ? `<div class="qty-stepper"><button data-dec="${p.ID}">−</button><input type="number" inputmode="numeric" class="qv" min="1" value="${cart[p.ID].qty}" data-qty-input="${p.ID}" onfocus="this.select()"><button data-inc="${p.ID}">+</button></div>`
       : `<button class="add-btn" data-add="${p.ID}">+</button>`;
     const meta = isService ? '<span class="stock">услуга</span>' : `<span class="stock ${Number(p.Quantity) <= 0 ? 'low' : ''}">ост. ${p.Quantity}</span>`;
     return `<div class="product-row">
@@ -161,6 +161,17 @@ document.getElementById('catalogList').addEventListener('click', e => {
       if (cart[id].qty <= 0) delete cart[id];
     }
   }
+  renderCatalog(document.getElementById('searchInput').value);
+});
+
+// Typing a quantity directly (instead of tapping + repeatedly) - committed
+// on blur/Enter via 'change' so a full re-render doesn't fight the keystrokes.
+document.getElementById('catalogList').addEventListener('change', e => {
+  const id = e.target.closest('[data-qty-input]')?.dataset.qtyInput;
+  if (!id || !cart[id]) return;
+  const qty = Math.floor(Number(e.target.value));
+  if (!qty || qty < 1) delete cart[id];
+  else cart[id].qty = qty;
   renderCatalog(document.getElementById('searchInput').value);
 });
 
@@ -240,7 +251,7 @@ function openSheet(id) {
   document.getElementById('sheetThumb').textContent = initials(p.Name);
   document.getElementById('sheetName').textContent = p.Name;
   document.getElementById('sheetSub').textContent = (p.Code || p.Article || '') + (p.Quantity === undefined ? ' · услуга' : ' · остаток ' + p.Quantity);
-  document.getElementById('qtyVal').textContent = c.qty;
+  document.getElementById('qtyVal').value = c.qty;
   document.getElementById('priceInput').value = c.price;
   document.getElementById('sheetBackdrop').classList.add('open');
 }
@@ -248,15 +259,15 @@ function closeSheet() { document.getElementById('sheetBackdrop').classList.remov
 
 document.getElementById('qtyMinus').addEventListener('click', () => {
   const v = document.getElementById('qtyVal');
-  v.textContent = Math.max(1, Number(v.textContent) - 1);
+  v.value = Math.max(1, (Number(v.value) || 0) - 1);
 });
 document.getElementById('qtyPlus').addEventListener('click', () => {
   const v = document.getElementById('qtyVal');
-  v.textContent = Number(v.textContent) + 1;
+  v.value = (Number(v.value) || 0) + 1;
 });
 document.getElementById('sheetSaveBtn').addEventListener('click', () => {
   if (!editingId) return;
-  cart[editingId].qty = Number(document.getElementById('qtyVal').textContent);
+  cart[editingId].qty = Math.max(1, Math.floor(Number(document.getElementById('qtyVal').value)) || 1);
   cart[editingId].price = Number(document.getElementById('priceInput').value) || 0;
   closeSheet();
   renderCart();

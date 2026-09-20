@@ -62,7 +62,11 @@ body{
   width:30px; height:32px; border:none; background:none; color:var(--teal-dark);
   font-size:17px; font-weight:700; display:flex; align-items:center; justify-content:center;
 }
-.qty-stepper .qv{ min-width:20px; text-align:center; font-size:13px; font-weight:800; color:var(--teal-dark); }
+.qty-stepper .qv{
+  min-width:26px; width:34px; text-align:center; font-size:13px; font-weight:800; color:var(--teal-dark);
+  border:none; background:none; font-family:inherit; padding:0; -moz-appearance:textfield;
+}
+.qty-stepper .qv::-webkit-outer-spin-button, .qty-stepper .qv::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
 
 .cart-bar{
   position:absolute; left:12px; right:12px; bottom:calc(16px + env(safe-area-inset-bottom,0px));
@@ -162,7 +166,11 @@ body{
 .stepper .lbl{ font-size:13px; color:var(--muted); font-weight:600; padding-left:6px; }
 .stepper-ctl{ display:flex; align-items:center; gap:0; }
 .stepper-ctl button{ width:36px; height:36px; border-radius:9px; border:none; background:var(--surface); font-size:19px; font-weight:700; color:var(--text); }
-.stepper-ctl .val{ width:40px; text-align:center; font-size:15px; font-weight:700; }
+.stepper-ctl .val{
+  width:40px; text-align:center; font-size:15px; font-weight:700; color:var(--text);
+  border:none; background:none; font-family:inherit; padding:0; -moz-appearance:textfield;
+}
+.stepper-ctl .val::-webkit-outer-spin-button, .stepper-ctl .val::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
 .field-row{ display:flex; align-items:center; justify-content:space-between; background:var(--surface-alt); border-radius:12px; padding:11px 14px; margin-bottom:10px; }
 .field-row .lbl{ font-size:13px; color:var(--muted); font-weight:600; }
 .field-row input{ border:none; background:none; text-align:right; font-size:14px; font-weight:700; color:var(--text); width:130px; font-family:inherit; }

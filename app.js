@@ -476,7 +476,7 @@ function openRepackRecipeModal() {
 // createProductPickerRow) for the two product fields in the recipe modal.
 function attachProductSearch(searchInput, idInput) {
   const suggestBox = document.createElement('div');
-  suggestBox.className = 'picker-suggestions';
+  suggestBox.className = 'picker-suggestions item-product-suggestions';
   suggestBox.hidden = true;
   document.body.appendChild(suggestBox);
 

@@ -492,11 +492,7 @@ function attachProductSearch(searchInput, idInput) {
     const q = query.trim().toLowerCase();
     if (!q) { suggestBox.hidden = true; return; }
     positionSuggestBox();
-    const matches = state.products.filter(p =>
-      String(p.Name || '').toLowerCase().includes(q) ||
-      String(p.Code || '').toLowerCase().includes(q) ||
-      String(p.Article || '').toLowerCase().includes(q)
-    ).slice(0, 10);
+    const matches = searchProducts(state.products, query, 20);
     if (!matches.length) {
       suggestBox.innerHTML = '<div class="picker-suggestion" style="color:var(--muted);">Не найдено</div>';
       suggestBox.hidden = false;
@@ -691,11 +687,7 @@ function createProductPickerRow(containerId, priceFn, onChange, getItems) {
     const q = query.trim().toLowerCase();
     if (!q) { suggestBox.hidden = true; return; }
     positionSuggestBox();
-    const matches = getItems().filter(p =>
-      String(p.Name || '').toLowerCase().includes(q) ||
-      String(p.Code || '').toLowerCase().includes(q) ||
-      String(p.Article || '').toLowerCase().includes(q)
-    ).slice(0, 10);
+    const matches = searchProducts(getItems(), query, 20);
     if (!matches.length) {
       suggestBox.innerHTML = '<div class="picker-suggestion" style="color:var(--muted);">Не найдено</div>';
       suggestBox.hidden = false;
@@ -1293,6 +1285,31 @@ function escapeHtml(str) {
 
 function formatMoney(n) {
   return Number(n || 0).toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// Ranks matches so an exact/prefix Code or Article hit (what someone typing a
+// specific code like "1003rl" almost always means) always outranks a generic
+// substring hit buried inside a long Name - otherwise, in a catalog this big,
+// a relevant product can get pushed past the result cap by unrelated ones
+// whose Name just happens to contain the same fragment.
+function searchProducts(items, query, limit) {
+  const q = query.trim().toLowerCase();
+  if (!q) return [];
+  const scored = [];
+  items.forEach(p => {
+    const name = String(p.Name || '').toLowerCase();
+    const code = String(p.Code || '').toLowerCase();
+    const article = String(p.Article || '').toLowerCase();
+    let score = -1;
+    if (code === q || article === q) score = 0;
+    else if (code.startsWith(q) || article.startsWith(q)) score = 1;
+    else if (code.includes(q) || article.includes(q)) score = 2;
+    else if (name.startsWith(q)) score = 3;
+    else if (name.includes(q)) score = 4;
+    if (score >= 0) scored.push({ p, score });
+  });
+  scored.sort((a, b) => a.score - b.score);
+  return scored.slice(0, limit || 20).map(x => x.p);
 }
 
 function formatDate(d) {

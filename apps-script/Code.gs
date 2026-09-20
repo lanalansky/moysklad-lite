@@ -256,8 +256,16 @@ function deleteService(s) {
 
 // ---- Repack recipes (break a box of N pieces into individually-sold units,
 // e.g. a 20-pack of cartridges -> single поштучно cartridges of the same kind) ----
+// A slow response over a bad connection can make the client's own retry
+// logic re-send this same request, which would otherwise create duplicate
+// cards for the same box/piece pair - so treat it as idempotent and just
+// hand back the existing recipe instead of inserting a second row.
 function addRepackRecipe(p) {
   var sheet = repackRecipesSheet();
+  var existing = sheetToObjects(sheet, REPACK_RECIPES_HEADERS).filter(function (r) {
+    return r.BoxProductId === p.boxProductId && r.PieceProductId === p.pieceProductId;
+  })[0];
+  if (existing) return existing;
   var obj = { ID: newId(), BoxProductId: p.boxProductId, PieceProductId: p.pieceProductId, PackSize: Number(p.packSize) || 1 };
   sheet.appendRow(REPACK_RECIPES_HEADERS.map(function (h) { return obj[h]; }));
   return obj;

@@ -243,6 +243,8 @@ main { padding: 24px; }
 
 .data-table th { background: #fafbfc; color: var(--muted); font-weight: 600; }
 .data-table tbody tr:last-child td { border-bottom: none; }
+.clickable-row { cursor: pointer; }
+.clickable-row:hover td { background: var(--bg); }
 .data-table td.actions { text-align: right; white-space: nowrap; }
 .data-table td.actions button { margin-left: 6px; }
 

@@ -1061,7 +1061,7 @@ function renderSales() {
   const body = document.getElementById('salesBody');
   const sales = state.sales.slice().reverse();
   body.innerHTML = sales.map(s => `
-    <tr>
+    <tr class="clickable-row" data-open-sale="${s.ID}">
       <td>${formatDate(s.Date)}</td>
       <td>${(s.Items || []).length}</td>
       <td>${formatMoney(s.CashAmount)}</td>
@@ -1084,13 +1084,43 @@ function renderSales() {
     : '';
 }
 
+function saleMethodLabel(s) {
+  const cash = Number(s.CashAmount) || 0, card = Number(s.CardAmount) || 0;
+  if (cash > 0 && card > 0) return 'Смешанная — нал. + ' + (s.Provider || 'безнал.');
+  if (card > 0) return s.Provider || 'Безналичными';
+  return 'Наличными';
+}
+
+function openSaleDetail(id) {
+  const s = state.sales.find(x => x.ID === id);
+  if (!s) return;
+  const subtotal = (s.Items || []).reduce((sum, i) => sum + Number(i.qty) * Number(i.price), 0);
+  document.getElementById('saleDetailMeta').textContent =
+    formatDate(s.Date) + ' · ' + saleMethodLabel(s) + (s.Comment ? ' · ' + s.Comment : '');
+  document.getElementById('saleDetailItemsBody').innerHTML = (s.Items || []).map(it => `
+    <tr>
+      <td>${escapeHtml(it.name)}</td>
+      <td>${it.qty}</td>
+      <td>${formatMoney(it.price)}</td>
+      <td>${formatMoney(it.qty * it.price)}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--muted);">Нет позиций</td></tr>';
+  document.getElementById('saleDetailSubtotal').textContent = formatMoney(subtotal);
+  document.getElementById('saleDetailDiscount').textContent = formatMoney(s.Discount || 0);
+  document.getElementById('saleDetailTotal').textContent = formatMoney(s.Total);
+  openModal('saleDetailModal');
+}
+
 document.getElementById('salesBody').addEventListener('click', async (e) => {
   const delId = e.target.dataset.deleteSale;
   if (delId) {
     if (!confirm('Удалить продажу? Остатки на складе будут возвращены.')) return;
     await api('deleteSale', { id: delId });
     await loadAll();
+    return;
   }
+  const openId = e.target.closest('tr[data-open-sale]')?.dataset.openSale;
+  if (openId) openSaleDetail(openId);
 });
 
 document.getElementById('salesShowBtn').addEventListener('click', renderSales);

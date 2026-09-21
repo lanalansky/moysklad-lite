@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MoySkladLite</title>
-<link rel="stylesheet" href="style.css?v=14">
+<link rel="stylesheet" href="style.css?v=15">
 </head>
 <body>
 <header class="topbar">
@@ -322,6 +322,26 @@
   </div>
 </div>
 
+<!-- Sale detail modal -->
+<div class="modal" id="saleDetailModal">
+  <div class="modal-content wide">
+    <h3>Продажа</h3>
+    <div id="saleDetailMeta" style="color:var(--muted);font-size:13px;margin-bottom:12px;"></div>
+    <table class="data-table" style="margin-bottom:12px;">
+      <thead><tr><th>Товар</th><th>Кол-во</th><th>Цена</th><th>Сумма</th></tr></thead>
+      <tbody id="saleDetailItemsBody"></tbody>
+    </table>
+    <div style="text-align:right;font-size:14px;line-height:1.7;">
+      <div>Товары: <b id="saleDetailSubtotal">0,00</b></div>
+      <div>Скидка: <b id="saleDetailDiscount">0,00</b></div>
+      <div style="font-size:16px;">Итого: <b id="saleDetailTotal">0,00</b></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" data-close="saleDetailModal">Закрыть</button>
+    </div>
+  </div>
+</div>
+
 <!-- Repack recipe modal -->
 <div class="modal" id="repackRecipeModal">
   <div class="modal-content">
@@ -435,7 +455,7 @@
   </div>
 </div>
 
-<script src="config.js?v=14"></script>
-<script src="app.js?v=14"></script>
+<script src="config.js?v=15"></script>
+<script src="app.js?v=15"></script>
 </body>
 </html>

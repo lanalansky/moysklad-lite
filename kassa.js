@@ -73,6 +73,16 @@ function isToday(d) {
   const now = new Date();
   return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
 }
+function isWithinDays(d, days) {
+  const date = new Date(d);
+  if (isNaN(date)) return false;
+  return (Date.now() - date.getTime()) <= days * 24 * 3600 * 1000;
+}
+function formatDateTime(d) {
+  const date = new Date(d);
+  if (isNaN(date)) return '';
+  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) + ', ' + formatTime(date);
+}
 // Товары have a Quantity (stock); услуги don't — that's how the catalog
 // tells the two apart wherever it needs different rendering or behavior.
 function getCatalogItems() { return state.products.concat(state.services); }
@@ -576,24 +586,27 @@ function saleMethodLabel(s) {
   return 'Наличными';
 }
 
+const HISTORY_DAYS = 7;
+
 function renderHistory() {
-  const todaysSales = state.sales.filter(s => isToday(s.Date)).slice().reverse();
+  const recentSales = state.sales.filter(s => isWithinDays(s.Date, HISTORY_DAYS)).slice().reverse();
   const list = document.getElementById('historyList');
-  list.innerHTML = todaysSales.map(s => {
+  list.innerHTML = recentSales.map(s => {
     const count = (s.Items || []).reduce((sum, i) => sum + Number(i.qty), 0);
+    const when = isToday(s.Date) ? formatTime(s.Date) : formatDateTime(s.Date);
     return `<div class="history-item" data-open-sale="${s.ID}">
       <div class="hs-icon">✓</div>
-      <div class="hs-info"><div class="hs-title">${count} тов. · ${escapeHtml(saleMethodLabel(s))}</div><div class="hs-sub">${formatTime(s.Date)}</div></div>
+      <div class="hs-info"><div class="hs-title">${count} тов. · ${escapeHtml(saleMethodLabel(s))}</div><div class="hs-sub">${when}</div></div>
       <div class="hs-sum">${money(s.Total)}</div>
     </div>`;
-  }).join('') || '<div style="text-align:center;color:var(--muted);padding:30px 0;font-size:13px;">Сегодня продаж ещё не было</div>';
+  }).join('') || '<div style="text-align:center;color:var(--muted);padding:30px 0;font-size:13px;">За последние ' + HISTORY_DAYS + ' дней продаж не было</div>';
 }
 
 function openSaleDetail(id) {
   const s = state.sales.find(x => x.ID === id);
   if (!s) return;
   const subtotal = (s.Items || []).reduce((sum, i) => sum + Number(i.qty) * Number(i.price), 0);
-  document.getElementById('saleDetailTime').textContent = 'Сегодня, ' + formatTime(s.Date);
+  document.getElementById('saleDetailTime').textContent = isToday(s.Date) ? 'Сегодня, ' + formatTime(s.Date) : formatDateTime(s.Date);
   document.getElementById('saleDetailMethod').textContent = saleMethodLabel(s);
   document.getElementById('saleDetailItems').innerHTML = (s.Items || []).map(it => `
     <div class="sd-item">

@@ -73,10 +73,17 @@ function isToday(d) {
   const now = new Date();
   return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth() && date.getDate() === now.getDate();
 }
+// Calendar-day window (today + the previous `days - 1` calendar days), not a
+// rolling 24h*days clock - an hour-precise cutoff would silently drop a sale
+// made earlier in the day as today ticks past that same time, which reads as
+// "yesterday's sales just disappeared" rather than an obvious 7-day boundary.
 function isWithinDays(d, days) {
   const date = new Date(d);
   if (isNaN(date)) return false;
-  return (Date.now() - date.getTime()) <= days * 24 * 3600 * 1000;
+  const cutoff = new Date();
+  cutoff.setHours(0, 0, 0, 0);
+  cutoff.setDate(cutoff.getDate() - (days - 1));
+  return date >= cutoff;
 }
 function formatDateTime(d) {
   const date = new Date(d);
@@ -586,7 +593,7 @@ function saleMethodLabel(s) {
   return 'Наличными';
 }
 
-const HISTORY_DAYS = 7;
+const HISTORY_DAYS = 14;
 
 function renderHistory() {
   const recentSales = state.sales.filter(s => isWithinDays(s.Date, HISTORY_DAYS)).slice().reverse();

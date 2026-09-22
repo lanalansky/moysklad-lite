@@ -24,6 +24,7 @@ function getSheet(name, headers) {
 }
 
 function productsSheet() { return getSheet('Products', PRODUCTS_HEADERS); }
+function archivedProductsSheet() { return getSheet('ArchivedProducts', PRODUCTS_HEADERS); }
 function contactsSheet() { return getSheet('Contacts', CONTACTS_HEADERS); }
 function ordersSheet() { return getSheet('Orders', ORDERS_HEADERS); }
 function movementsSheet() { return getSheet('Movements', MOVEMENTS_HEADERS); }
@@ -92,6 +93,7 @@ function doPost(e) {
       case 'addProduct': result = addProduct(payload); break;
       case 'updateProduct': result = updateProduct(payload); break;
       case 'deleteProduct': result = deleteProduct(payload); break;
+      case 'archiveProducts': result = archiveProducts(payload); break;
       case 'adjustStock': result = adjustStock(payload); break;
       case 'addContact': result = addContact(payload); break;
       case 'updateContact': result = updateContact(payload); break;
@@ -189,6 +191,22 @@ function deleteProduct(p) {
   if (row === -1) throw new Error('Товар не найден');
   sheet.deleteRow(row);
   return { id: p.id };
+}
+
+function archiveProducts(p) {
+  var ids = p.ids || [];
+  var sheet = productsSheet();
+  var archive = archivedProductsSheet();
+  var archived = [];
+  ids.forEach(function (id) {
+    var row = findRowById(sheet, id);
+    if (row === -1) return;
+    var values = sheet.getRange(row, 1, 1, PRODUCTS_HEADERS.length).getValues()[0];
+    archive.appendRow(values);
+    sheet.deleteRow(row);
+    archived.push(id);
+  });
+  return { archived: archived };
 }
 
 function adjustStock(p) {

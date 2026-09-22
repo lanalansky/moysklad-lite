@@ -122,13 +122,13 @@ async function loadAll(silent) {
 
 // ---- Catalog ----
 function renderCatalog(filter) {
-  const q = (filter || '').trim().toLowerCase();
+  const words = (filter || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
   const list = document.getElementById('catalogList');
-  const items = getCatalogItems().filter(p => !q ||
-    String(p.Name || '').toLowerCase().includes(q) ||
-    String(p.Code || '').toLowerCase().includes(q) ||
-    String(p.Article || '').toLowerCase().includes(q)
-  );
+  const items = getCatalogItems().filter(p => {
+    if (!words.length) return true;
+    const haystack = [p.Name, p.Code, p.Article].filter(Boolean).join(' ').toLowerCase();
+    return words.every(w => haystack.includes(w));
+  });
   list.innerHTML = items.map(p => {
     const isService = p.Quantity === undefined;
     const inCart = !!cart[p.ID];
@@ -157,6 +157,7 @@ function updateCartBar() {
   document.getElementById('cartBarCount').textContent = count;
   document.getElementById('cartBarSum').textContent = money(sum);
   bar.classList.toggle('hidden', ids.length === 0);
+  document.getElementById('catalogList').classList.toggle('has-cart-bar', ids.length > 0);
 }
 
 document.getElementById('searchInput').addEventListener('input', e => renderCatalog(e.target.value));

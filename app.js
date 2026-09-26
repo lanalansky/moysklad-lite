@@ -88,23 +88,41 @@ async function loadAll() {
 }
 
 // ---- Tabs ----
+const ADMIN_TAB_KEY = 'msl_admin_tab';
+const ADMIN_SUBTAB_KEY = 'msl_admin_subtab';
+
+function setActiveAdminTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  try { localStorage.setItem(ADMIN_TAB_KEY, tab); } catch (e) {}
+}
+
+function setActiveAdminSubtab(subtab) {
+  const btn = document.querySelector(`.subtab[data-subtab="${subtab}"]`);
+  const panel = document.getElementById('sub-' + subtab);
+  if (!btn || !panel) return;
+  document.querySelectorAll('.subtab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.subtab-panel').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  panel.classList.add('active');
+  try { localStorage.setItem(ADMIN_SUBTAB_KEY, subtab); } catch (e) {}
+}
+
 document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
-  });
+  btn.addEventListener('click', () => setActiveAdminTab(btn.dataset.tab));
 });
 
 document.querySelectorAll('.subtab').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.subtab').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.subtab-panel').forEach(p => p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('sub-' + btn.dataset.subtab).classList.add('active');
-  });
+  btn.addEventListener('click', () => setActiveAdminSubtab(btn.dataset.subtab));
 });
+
+try {
+  const savedTab = localStorage.getItem(ADMIN_TAB_KEY);
+  if (savedTab && document.getElementById('tab-' + savedTab)) setActiveAdminTab(savedTab);
+  const savedSubtab = localStorage.getItem(ADMIN_SUBTAB_KEY);
+  if (savedSubtab && document.getElementById('sub-' + savedSubtab)) setActiveAdminSubtab(savedSubtab);
+} catch (e) {}
 
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }

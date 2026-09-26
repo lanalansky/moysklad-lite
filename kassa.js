@@ -208,16 +208,19 @@ document.querySelectorAll('[data-nav]').forEach(el => {
   el.addEventListener('click', () => goto(el.dataset.nav));
 });
 
+const KASSA_TAB_KEY = 'msl_kassa_tab';
+
+function setActiveKassaTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + tab).classList.add('active');
+  if (tab === 'history') renderHistory();
+  if (tab === 'report') renderReport();
+  try { localStorage.setItem(KASSA_TAB_KEY, tab); } catch (e) {}
+}
+
 document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    const tab = btn.dataset.tab;
-    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-    document.getElementById('view-' + tab).classList.add('active');
-    if (tab === 'history') renderHistory();
-    if (tab === 'report') renderReport();
-  });
+  btn.addEventListener('click', () => setActiveKassaTab(btn.dataset.tab));
 });
 
 // ---- Cart / Чек ----
@@ -645,7 +648,13 @@ if (!CONFIG.API_URL || CONFIG.API_URL.startsWith('PASTE_')) {
   // Apps Script's first request after being idle ("cold start") can be slow
   // enough to exhaust api()'s own retries. One extra automatic retry a few
   // seconds later covers that without making the seller reload the page.
-  loadAll().then(() => { if (!state.products.length) setTimeout(() => loadAll(), 3000); });
+  loadAll().then(() => {
+    if (!state.products.length) setTimeout(() => loadAll(), 3000);
+    try {
+      const savedTab = localStorage.getItem(KASSA_TAB_KEY);
+      if (savedTab && document.getElementById('view-' + savedTab)) setActiveKassaTab(savedTab);
+    } catch (e) {}
+  });
   setInterval(() => loadAll(true), 3 * 60 * 1000);
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});

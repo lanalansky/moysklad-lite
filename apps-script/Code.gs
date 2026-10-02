@@ -76,6 +76,44 @@ function jsonResponse(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
+// ---- Idempotency (retried writes must not create a second record) ----
+// The client generates one key per logical call (addSale, addOrder, etc.) and
+// resends the same key on every retry of that call. doPost() checks the key
+// before dispatching to the handler and replays the first call's stored
+// result instead of re-running it, so a dropped response that the client
+// treats as a failure can't turn into a duplicate sale/order/payment/etc.
+// This lives in doPost rather than in each handler because doPost already
+// holds the script-wide lock for the whole request, so there's no race
+// between a check and a write even if two retries land back to back.
+var IDEMPOTENCY_HEADERS = ['Key', 'Date', 'ResultJSON'];
+function idempotencyKeysSheet() { return getSheet('IdempotencyKeys', IDEMPOTENCY_HEADERS); }
+
+// Returns undefined when this key hasn't been seen before.
+function findIdempotentResult(key) {
+  var sheet = idempotencyKeysSheet();
+  var row = findRowById(sheet, key);
+  if (row === -1) return undefined;
+  var json = sheet.getRange(row, IDEMPOTENCY_HEADERS.indexOf('ResultJSON') + 1).getValue();
+  return JSON.parse(json);
+}
+
+function saveIdempotentResult(key, result) {
+  var sheet = idempotencyKeysSheet();
+  sheet.appendRow([key, new Date(), JSON.stringify(result === undefined ? null : result)]);
+  pruneOldIdempotencyKeys(sheet);
+}
+
+// A day is far longer than any realistic retry window, so this can't prune a
+// key before a legitimate retry would use it, while keeping the log from
+// growing forever.
+function pruneOldIdempotencyKeys(sheet) {
+  var cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  var data = sheet.getDataRange().getValues();
+  for (var i = data.length - 1; i >= 1; i--) {
+    if (data[i][0] !== '' && new Date(data[i][1]) < cutoff) sheet.deleteRow(i + 1);
+  }
+}
+
 function doGet(e) {
   return jsonResponse({ ok: true, message: 'MoySkladLite API is running' });
 }
@@ -87,6 +125,11 @@ function doPost(e) {
     var body = JSON.parse(e.postData.contents);
     var action = body.action;
     var payload = body.payload || {};
+    var idemKey = payload._idempotencyKey;
+    if (idemKey) {
+      var cached = findIdempotentResult(idemKey);
+      if (cached !== undefined) return jsonResponse({ ok: true, data: cached });
+    }
     var result;
     switch (action) {
       case 'getAll': result = getAll(); break;
@@ -122,6 +165,7 @@ function doPost(e) {
       case 'getPnl': result = getPnl(payload); break;
       default: throw new Error('Unknown action: ' + action);
     }
+    if (idemKey) saveIdempotentResult(idemKey, result);
     return jsonResponse({ ok: true, data: result });
   } catch (err) {
     return jsonResponse({ ok: false, error: err.message });

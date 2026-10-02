@@ -31,15 +31,32 @@ function guardClick(el, handler) {
   });
 }
 
+// Read-only actions are safe to retry as-is; everything else gets an
+// idempotency key (see generateIdempotencyKey) so a retry can't double-write.
+const READ_ONLY_ACTIONS = new Set(['getAll']);
+
+// Generated once per logical call, before the retry loop, so every retry of
+// the same call reuses the same key and the server can recognize it as a
+// repeat instead of a new write.
+function generateIdempotencyKey() {
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0;
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+  });
+}
+
 async function api(action, payload) {
   const maxAttempts = 3;
   let lastErr;
+  const body = { ...(payload || {}) };
+  if (!READ_ONLY_ACTIONS.has(action)) body._idempotencyKey = generateIdempotencyKey();
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const res = await fetch(CONFIG.API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({ action, payload: payload || {} })
+        body: JSON.stringify({ action, payload: body })
       });
       const text = await res.text();
       const json = JSON.parse(text);

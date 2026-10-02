@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MoySkladLite</title>
-<link rel="stylesheet" href="style.css?v=24">
+<link rel="stylesheet" href="style.css?v=25">
 </head>
 <body>
 <header class="topbar">
@@ -73,6 +73,20 @@
       <button class="btn primary" id="addRepackRecipeBtn">+ Новая пара пересорта</button>
     </div>
     <div class="recipe-grid" id="repackGrid"></div>
+
+    <div class="panel-head" style="margin-top:32px;">
+      <h2>История пересортов</h2>
+    </div>
+    <div class="filters">
+      <div class="field"><label>Товар</label><input type="text" id="repackHistorySearch" placeholder="Название, код или артикул…"></div>
+      <div class="field"><label>Период с</label><input type="date" id="repackHistoryFrom"></div>
+      <div class="field"><label>по</label><input type="date" id="repackHistoryTo"></div>
+      <button class="btn primary" id="repackHistoryShowBtn">Показать</button>
+    </div>
+    <table class="data-table">
+      <thead><tr><th>Дата</th><th>Короб</th><th>Поштучно</th></tr></thead>
+      <tbody id="repackHistoryBody"></tbody>
+    </table>
   </section>
 
   <section id="tab-contacts" class="tab-panel">
@@ -477,7 +491,7 @@
   </div>
 </div>
 
-<script src="config.js?v=24"></script>
-<script src="app.js?v=24"></script>
+<script src="config.js?v=25"></script>
+<script src="app.js?v=25"></script>
 </body>
 </html>

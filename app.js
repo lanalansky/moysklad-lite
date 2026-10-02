@@ -1,4 +1,4 @@
-const state = { products: [], contacts: [], orders: [], inventories: [], sales: [], payments: [], services: [], repackRecipes: [] };
+const state = { products: [], contacts: [], orders: [], inventories: [], sales: [], payments: [], services: [], repackRecipes: [], repackHistory: [] };
 let selectedGroupPath = null; // null = "Товары и услуги" (без своей папки)
 let expandedGroups = new Set();
 let editingSaleId = null;
@@ -91,6 +91,7 @@ async function loadAll() {
     state.payments = data.payments || [];
     state.services = data.services || [];
     state.repackRecipes = data.repackRecipes || [];
+    state.repackHistory = data.repackHistory || [];
     renderGroupTree();
     renderProducts();
     renderServices();
@@ -101,6 +102,7 @@ async function loadAll() {
     renderSales();
     renderPayments();
     renderRepack();
+    renderRepackHistory();
     setStatus('Обновлено: ' + new Date().toLocaleTimeString());
   } catch (err) {
     setStatus('Ошибка: ' + err.message, true);
@@ -510,6 +512,35 @@ document.getElementById('repackGrid').addEventListener('click', async (e) => {
     await loadAll();
   }
 });
+
+// Each entry is one past repackExecute() run (box out + piece in), newest first.
+function renderRepackHistory() {
+  const search = document.getElementById('repackHistorySearch').value.trim().toLowerCase();
+  const fromVal = document.getElementById('repackHistoryFrom').value;
+  const toVal = document.getElementById('repackHistoryTo').value;
+  const from = fromVal ? new Date(fromVal + 'T00:00:00') : null;
+  const to = toVal ? new Date(toVal + 'T23:59:59') : null;
+  const rows = state.repackHistory.filter(h => {
+    if (search) {
+      const hay = (h.BoxProductName + ' ' + h.PieceProductName).toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    const d = new Date(h.Date);
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    return true;
+  });
+  document.getElementById('repackHistoryBody').innerHTML = rows.map(h => `
+    <tr>
+      <td>${formatDate(h.Date)}</td>
+      <td>${escapeHtml(h.BoxProductName)} <span style="color:var(--muted);">(${h.BoxDelta})</span></td>
+      <td>${escapeHtml(h.PieceProductName)} <span style="color:var(--muted);">(+${h.PieceDelta})</span></td>
+    </tr>
+  `).join('') || '<tr><td colspan="3" style="text-align:center;color:var(--muted);">Ничего не найдено</td></tr>';
+}
+
+document.getElementById('repackHistoryShowBtn').addEventListener('click', renderRepackHistory);
+document.getElementById('repackHistorySearch').addEventListener('input', renderRepackHistory);
 
 document.getElementById('addRepackRecipeBtn').addEventListener('click', openRepackRecipeModal);
 

@@ -197,7 +197,8 @@ function getAll() {
   });
   var services = sheetToObjects(servicesSheet(), SERVICES_HEADERS);
   var repackRecipes = sheetToObjects(repackRecipesSheet(), REPACK_RECIPES_HEADERS);
-  return { products: products, contacts: contacts, orders: orders, inventories: inventories, sales: sales, payments: payments, held: held, services: services, repackRecipes: repackRecipes };
+  var repackHistory = getRepackHistory();
+  return { products: products, contacts: contacts, orders: orders, inventories: inventories, sales: sales, payments: payments, held: held, services: services, repackRecipes: repackRecipes, repackHistory: repackHistory };
 }
 
 // ---- Products ----
@@ -413,6 +414,28 @@ function movementsByProduct() {
     (byProduct[m.ProductId] = byProduct[m.ProductId] || []).push(m);
   });
   return byProduct;
+}
+
+// repackExecute() always logs exactly two 'repack' movements back to back
+// (box out, then piece in) inside the same locked request, so consecutive
+// pairs in sheet order are always one execution - no need to match them up
+// by RefId (which is only the recipe's own id, shared by every run of it).
+function getRepackHistory() {
+  var movements = sheetToObjects(movementsSheet(), MOVEMENTS_HEADERS)
+    .filter(function (m) { return m.Type === 'repack'; });
+  var history = [];
+  for (var i = 0; i + 1 < movements.length; i += 2) {
+    var a = movements[i], b = movements[i + 1];
+    var boxM = a.Delta < 0 ? a : b;
+    var pieceM = a.Delta < 0 ? b : a;
+    history.push({
+      Date: boxM.Date, RecipeId: boxM.RefId,
+      BoxProductId: boxM.ProductId, BoxProductName: boxM.ProductName, BoxDelta: boxM.Delta,
+      PieceProductId: pieceM.ProductId, PieceProductName: pieceM.ProductName, PieceDelta: pieceM.Delta
+    });
+  }
+  history.reverse();
+  return history;
 }
 
 // Reconstructs each product's quantity at an exact moment in time by rolling back

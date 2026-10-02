@@ -107,6 +107,7 @@ function doPost(e) {
       case 'addInventory': result = addInventory(payload); break;
       case 'deleteInventory': result = deleteInventory(payload); break;
       case 'addSale': result = addSale(payload); break;
+      case 'editSale': result = editSale(payload); break;
       case 'deleteSale': result = deleteSale(payload); break;
       case 'addPayment': result = addPayment(payload); break;
       case 'deletePayment': result = deletePayment(payload); break;
@@ -621,6 +622,39 @@ function addSale(o) {
     var heldRow = findRowById(heldSheet(), o.heldId);
     if (heldRow !== -1) heldSheet().deleteRow(heldRow);
   }
+  return obj;
+}
+
+// Corrects a mis-entered sale in place: reverses the old items' stock effect,
+// applies the new items' stock effect, and overwrites the row, keeping the
+// original ID and Date so it stays the same document in history.
+function editSale(payload) {
+  var sheet = salesSheet();
+  var row = findRowById(sheet, payload.id);
+  if (row === -1) throw new Error('Продажа не найдена');
+  var data = sheet.getRange(row, 1, 1, SALES_HEADERS.length).getValues()[0];
+  var oldItems = JSON.parse(data[SALES_HEADERS.indexOf('ItemsJSON')] || '[]');
+  applyStockDelta(oldItems, -1, 'sale', payload.id, 'Корректировка продажи (отмена)');
+
+  var items = (payload.items || []).map(function (i) {
+    return { productId: i.productId, name: i.name, qty: Number(i.qty), price: Number(i.price) };
+  });
+  var subtotal = items.reduce(function (sum, i) { return sum + i.qty * i.price; }, 0);
+  var discount = Number(payload.discount) || 0;
+  var obj = {
+    ID: payload.id,
+    Date: data[SALES_HEADERS.indexOf('Date')],
+    ItemsJSON: JSON.stringify(items),
+    CashAmount: Number(payload.cashAmount) || 0,
+    CardAmount: Number(payload.cardAmount) || 0,
+    Discount: discount,
+    Total: subtotal - discount,
+    Comment: payload.comment || '',
+    Provider: payload.provider || ''
+  };
+  setRowByHeaders(sheet, SALES_HEADERS, row, obj);
+  applyStockDelta(items, 1, 'sale', payload.id, 'Корректировка продажи');
+  obj.Items = items;
   return obj;
 }
 

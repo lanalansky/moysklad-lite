@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MoySkladLite</title>
-<link rel="stylesheet" href="style.css?v=18">
+<link rel="stylesheet" href="style.css?v=19">
 </head>
 <body>
 <header class="topbar">
@@ -338,6 +338,7 @@
     </div>
     <div class="modal-actions">
       <button class="btn" data-close="saleDetailModal">Закрыть</button>
+      <button class="btn primary" id="saleDetailEditBtn">Редактировать</button>
     </div>
   </div>
 </div>
@@ -434,7 +435,7 @@
 <!-- Sale modal -->
 <div class="modal" id="saleModal">
   <div class="modal-content wide">
-    <h3>Новая продажа</h3>
+    <h3 id="saleModalTitle">Новая продажа</h3>
     <table class="data-table" id="saleItemsTable">
       <thead><tr><th>Товар</th><th>Кол-во</th><th>Цена</th><th>Сумма</th><th></th></tr></thead>
       <tbody id="saleItemsBody"></tbody>
@@ -476,7 +477,7 @@
   </div>
 </div>
 
-<script src="config.js?v=18"></script>
-<script src="app.js?v=18"></script>
+<script src="config.js?v=19"></script>
+<script src="app.js?v=19"></script>
 </body>
 </html>

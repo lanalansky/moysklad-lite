@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MoySkladLite</title>
-<link rel="stylesheet" href="style.css?v=25">
+<link rel="stylesheet" href="style.css?v=26">
 </head>
 <body>
 <header class="topbar">
@@ -357,6 +357,34 @@
   </div>
 </div>
 
+<!-- Product detail modal: quick view of prices, stock and history, opened by
+     clicking a product name anywhere it appears in the app -->
+<div class="modal" id="productDetailModal">
+  <div class="modal-content wide">
+    <h3 id="productDetailTitle">Товар</h3>
+    <div id="productDetailMeta" style="color:var(--muted);font-size:13px;margin-bottom:12px;"></div>
+    <div class="product-grid" style="margin-bottom:16px;">
+      <div>
+        <div class="section-label">Цены и остаток</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;font-size:14px;">
+          <div><div style="color:var(--muted);font-size:12px;">Закуп.</div><b id="productDetailCost">0,00</b></div>
+          <div><div style="color:var(--muted);font-size:12px;">Мин.</div><b id="productDetailMin">0,00</b></div>
+          <div><div style="color:var(--muted);font-size:12px;">Продажа</div><b id="productDetailPrice">0,00</b></div>
+          <div><div style="color:var(--muted);font-size:12px;">Остаток</div><b id="productDetailQty">0</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="section-label">История</div>
+    <table class="data-table" style="margin-bottom:12px;">
+      <thead><tr><th>Дата</th><th>Тип</th><th>Контрагент / комментарий</th><th>Кол-во</th><th>Цена</th><th>Сумма</th></tr></thead>
+      <tbody id="productDetailHistoryBody"></tbody>
+    </table>
+    <div class="modal-actions">
+      <button class="btn" data-close="productDetailModal">Закрыть</button>
+    </div>
+  </div>
+</div>
+
 <!-- Order detail modal -->
 <div class="modal" id="orderDetailModal">
   <div class="modal-content wide">
@@ -491,7 +519,7 @@
   </div>
 </div>
 
-<script src="config.js?v=25"></script>
-<script src="app.js?v=25"></script>
+<script src="config.js?v=26"></script>
+<script src="app.js?v=26"></script>
 </body>
 </html>

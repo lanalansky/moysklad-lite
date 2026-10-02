@@ -245,6 +245,8 @@ main { padding: 24px; }
 .data-table tbody tr:last-child td { border-bottom: none; }
 .clickable-row { cursor: pointer; }
 .clickable-row:hover td { background: var(--bg); }
+.product-link { cursor: pointer; color: var(--primary); text-decoration: underline; text-decoration-color: transparent; transition: text-decoration-color .1s; }
+.product-link:hover { text-decoration-color: var(--primary); }
 .data-table td.actions { text-align: right; white-space: nowrap; }
 .data-table td.actions button { margin-left: 6px; }
 
@@ -268,6 +270,9 @@ main { padding: 24px; }
    product without losing the document in progress), so it must paint
    above every other modal regardless of DOM order. */
 #productModal { z-index: 60; }
+/* Likewise openable from inside the order/sale detail modals (clicking a
+   product name on one of their item rows). */
+#productDetailModal { z-index: 60; }
 
 .modal-content {
   background: var(--panel);

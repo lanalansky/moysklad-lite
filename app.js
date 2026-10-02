@@ -157,6 +157,69 @@ document.querySelectorAll('[data-close]').forEach(btn => {
   });
 });
 
+// Wraps a product/service name in a span that opens its detail card — used
+// everywhere a product name is shown as plain text (lists, item tables,
+// recipe cards, reports) so it's clickable from anywhere in the app.
+function productLink(productId, name) {
+  return `<span class="product-link" data-open-product="${productId}">${escapeHtml(name)}</span>`;
+}
+
+// Delegated at the document level (capture phase) so it works for every
+// table/card without each render function needing its own listener. Capture
+// fires before a row's own bubble-phase handler (e.g. a sale/order row that
+// opens its own detail modal on click), so stopPropagation here actually
+// prevents that row handler from also firing for the same click.
+document.addEventListener('click', (e) => {
+  const link = e.target.closest('[data-open-product]');
+  if (!link) return;
+  e.stopPropagation();
+  openProductDetail(link.dataset.openProduct);
+}, true);
+
+function openProductDetail(productId) {
+  const isService = state.services.some(x => x.ID === productId);
+  const p = state.products.find(x => x.ID === productId) || state.services.find(x => x.ID === productId);
+  if (!p) return;
+
+  document.getElementById('productDetailTitle').textContent = p.Name;
+  document.getElementById('productDetailMeta').textContent =
+    [p.Group, p.Article, p.Code, p.Unit].filter(Boolean).join(' · ') || (isService ? 'Услуга' : '');
+  document.getElementById('productDetailCost').textContent = isService ? '—' : formatMoney(p.CostPrice);
+  document.getElementById('productDetailMin').textContent = isService ? '—' : formatMoney(p.MinPrice);
+  document.getElementById('productDetailPrice').textContent = formatMoney(p.Price);
+  document.getElementById('productDetailQty').textContent = isService ? '—' : p.Quantity;
+
+  const rows = [];
+  state.sales.forEach(s => {
+    (s.Items || []).forEach(it => {
+      if (it.productId === productId) {
+        rows.push({ date: s.Date, type: 'Продажа', who: s.Comment || '', qty: it.qty, price: it.price });
+      }
+    });
+  });
+  state.orders.forEach(o => {
+    (o.Items || []).forEach(it => {
+      if (it.productId === productId) {
+        const type = (o.Type === 'purchase' ? 'Закупка' : 'Продажа') + (o.Status === 'draft' ? ' (черновик)' : '');
+        rows.push({ date: o.Date, type, who: o.ContactName || '', qty: it.qty, price: it.price });
+      }
+    });
+  });
+  rows.sort((a, b) => new Date(b.date) - new Date(a.date));
+  document.getElementById('productDetailHistoryBody').innerHTML = rows.map(r => `
+    <tr>
+      <td>${formatDate(r.date)}</td>
+      <td>${escapeHtml(r.type)}</td>
+      <td>${escapeHtml(r.who)}</td>
+      <td>${r.qty}</td>
+      <td>${formatMoney(r.price)}</td>
+      <td>${formatMoney(r.qty * r.price)}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);">Нет операций</td></tr>';
+
+  openModal('productDetailModal');
+}
+
 // ---- Products ----
 
 // Builds a nested tree of group folders from products' "A/B/C" Group strings,
@@ -281,7 +344,7 @@ function renderProducts() {
   } else {
     body.innerHTML = items.map(p => `
       <tr>
-        <td>${escapeHtml(p.Name)}${p.isService ? '<span class="service-badge">услуга</span>' : ''}</td>
+        <td>${productLink(p.ID, p.Name)}${p.isService ? '<span class="service-badge">услуга</span>' : ''}</td>
         <td>${escapeHtml(p.Article)}</td>
         <td>${escapeHtml(p.Code)}</td>
         <td>${escapeHtml(p.Group)}</td>
@@ -384,7 +447,7 @@ function renderServices() {
   const body = document.getElementById('servicesBody');
   body.innerHTML = state.services.map(s => `
     <tr>
-      <td>${escapeHtml(s.Name)}</td>
+      <td>${productLink(s.ID, s.Name)}</td>
       <td>${escapeHtml(s.Code)}</td>
       <td>${escapeHtml(s.Unit)}</td>
       <td>${formatMoney(s.Price)}</td>
@@ -455,7 +518,7 @@ function renderRepack() {
         <div class="recipe-row">
           <div class="recipe-icon">📦</div>
           <div>
-            <div class="recipe-name">${escapeHtml(box.Name)}</div>
+            <div class="recipe-name">${productLink(box.ID, box.Name)}</div>
             <div class="recipe-stock ${boxStock <= 0 ? 'low' : ''}">на складе: ${boxStock} кор.</div>
           </div>
         </div>
@@ -463,7 +526,7 @@ function renderRepack() {
         <div class="recipe-row">
           <div class="recipe-icon">🧷</div>
           <div>
-            <div class="recipe-name">${escapeHtml(piece.Name)}</div>
+            <div class="recipe-name">${productLink(piece.ID, piece.Name)}</div>
             <div class="recipe-stock">на складе: ${Number(piece.Quantity) || 0} шт</div>
           </div>
         </div>
@@ -530,11 +593,12 @@ function renderRepackHistory() {
     if (to && d > to) return false;
     return true;
   });
+  const nameOrLink = (id, name) => state.products.some(p => p.ID === id) ? productLink(id, name) : escapeHtml(name);
   document.getElementById('repackHistoryBody').innerHTML = rows.map(h => `
     <tr>
       <td>${formatDate(h.Date)}</td>
-      <td>${escapeHtml(h.BoxProductName)} <span style="color:var(--muted);">(${h.BoxDelta})</span></td>
-      <td>${escapeHtml(h.PieceProductName)} <span style="color:var(--muted);">(+${h.PieceDelta})</span></td>
+      <td>${nameOrLink(h.BoxProductId, h.BoxProductName)} <span style="color:var(--muted);">(${h.BoxDelta})</span></td>
+      <td>${nameOrLink(h.PieceProductId, h.PieceProductName)} <span style="color:var(--muted);">(+${h.PieceDelta})</span></td>
     </tr>
   `).join('') || '<tr><td colspan="3" style="text-align:center;color:var(--muted);">Ничего не найдено</td></tr>';
 }
@@ -698,12 +762,25 @@ function truncateText(s, n) {
 }
 
 // Short "what's in this order" preview for the orders list, so the contents
-// are visible at a glance without opening the detail modal.
+// are visible at a glance without opening the detail modal. Each name is its
+// own clickable link; truncation is budgeted on the plain text so the HTML
+// markup around a link never gets cut mid-tag.
 function orderItemsPreview(o) {
   const items = o.Items || [];
   if (!items.length) return '';
-  const names = items.map(it => truncateText(orderItemName(it.productId), 15));
-  return truncateText(names.join(', '), 60);
+  const budget = 60;
+  let used = 0;
+  const parts = [];
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    const shortName = truncateText(orderItemName(it.productId), 15);
+    const sep = i > 0 ? ', ' : '';
+    if (used + sep.length + shortName.length > budget) { parts.push(sep + '…'); break; }
+    const exists = state.products.some(p => p.ID === it.productId) || state.services.some(p => p.ID === it.productId);
+    parts.push(sep + (exists ? productLink(it.productId, shortName) : escapeHtml(shortName)));
+    used += sep.length + shortName.length;
+  }
+  return parts.join('');
 }
 
 function renderOrders() {
@@ -715,7 +792,7 @@ function renderOrders() {
     <tr class="clickable-row" data-open-order="${o.ID}">
       <td>${formatDate(o.Date)}</td>
       <td>${escapeHtml(o.ContactName)}</td>
-      <td style="color:var(--muted);font-size:13px;">${escapeHtml(orderItemsPreview(o))}</td>
+      <td style="color:var(--muted);font-size:13px;">${orderItemsPreview(o)}</td>
       <td><span class="order-status ${o.Status}">${escapeHtml(ORDER_STATUS_LABELS[o.Status] || o.Status)}</span></td>
       <td>${formatMoney(o.Total)}</td>
       <td class="actions">
@@ -738,14 +815,18 @@ function openOrderDetail(id) {
   const subtotal = items.reduce((sum, i) => sum + Number(i.qty) * Number(i.price), 0);
   document.getElementById('orderDetailMeta').textContent =
     formatDate(o.Date) + (o.ContactName ? ' · ' + o.ContactName : '') + ' · ' + (ORDER_STATUS_LABELS[o.Status] || o.Status);
-  document.getElementById('orderDetailItemsBody').innerHTML = items.map(it => `
+  document.getElementById('orderDetailItemsBody').innerHTML = items.map(it => {
+    const name = orderItemName(it.productId);
+    const exists = state.products.some(p => p.ID === it.productId) || state.services.some(p => p.ID === it.productId);
+    return `
     <tr>
-      <td>${escapeHtml(orderItemName(it.productId))}</td>
+      <td>${exists ? productLink(it.productId, name) : escapeHtml(name)}</td>
       <td>${it.qty}</td>
       <td>${formatMoney(it.price)}</td>
       <td>${formatMoney(it.qty * it.price)}</td>
     </tr>
-  `).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--muted);">Нет позиций</td></tr>';
+  `;
+  }).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--muted);">Нет позиций</td></tr>';
   document.getElementById('orderDetailSubtotal').textContent = formatMoney(subtotal);
   document.getElementById('orderDetailDelivery').textContent = formatMoney(o.Delivery || 0);
   document.getElementById('orderDetailTotal').textContent = formatMoney(o.Total);
@@ -1039,7 +1120,7 @@ function renderTurnoverRows(rows) {
       totals.outQty += r.OutQty; totals.outSum += r.OutSum;
       totals.endQty += r.EndQty; totals.endSum += r.EndSum;
       html += `<tr>
-        <td>${escapeHtml(r.Name)}</td><td>${escapeHtml(r.Code)}</td><td>${escapeHtml(r.Unit)}</td>
+        <td>${productLink(r.ID, r.Name)}</td><td>${escapeHtml(r.Code)}</td><td>${escapeHtml(r.Unit)}</td>
         <td>${r.StartQty}</td><td>${formatMoney(r.StartSum)}</td>
         <td class="in-cell">${r.InQty}</td><td class="in-cell">${formatMoney(r.InSum)}</td>
         <td class="out-cell">${r.OutQty}</td><td class="out-cell">${formatMoney(r.OutSum)}</td>
@@ -1093,7 +1174,7 @@ function renderStock() {
       const saleSum = Number(p.Quantity) * Number(p.Price || 0);
       totals.qty += Number(p.Quantity); totals.costSum += costSum; totals.saleSum += saleSum;
       html += `<tr>
-        <td>${escapeHtml(p.Name)}</td><td>${escapeHtml(p.Code)}</td>
+        <td>${productLink(p.ID, p.Name)}</td><td>${escapeHtml(p.Code)}</td>
         <td class="${Number(p.Quantity) <= 0 ? 'low-stock' : ''}">${p.Quantity}</td><td>${escapeHtml(p.Unit)}</td>
         <td>${formatMoney(p.CostPrice)}</td><td>${formatMoney(costSum)}</td>
         <td>${formatMoney(p.Price)}</td><td>${formatMoney(saleSum)}</td>
@@ -1261,14 +1342,17 @@ function openSaleDetail(id) {
   const subtotal = (s.Items || []).reduce((sum, i) => sum + Number(i.qty) * Number(i.price), 0);
   document.getElementById('saleDetailMeta').textContent =
     formatDate(s.Date) + ' · ' + saleMethodLabel(s) + (s.Comment ? ' · ' + s.Comment : '');
-  document.getElementById('saleDetailItemsBody').innerHTML = (s.Items || []).map(it => `
+  document.getElementById('saleDetailItemsBody').innerHTML = (s.Items || []).map(it => {
+    const exists = state.products.some(p => p.ID === it.productId) || state.services.some(p => p.ID === it.productId);
+    return `
     <tr>
-      <td>${escapeHtml(it.name)}</td>
+      <td>${exists ? productLink(it.productId, it.name) : escapeHtml(it.name)}</td>
       <td>${it.qty}</td>
       <td>${formatMoney(it.price)}</td>
       <td>${formatMoney(it.qty * it.price)}</td>
     </tr>
-  `).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--muted);">Нет позиций</td></tr>';
+  `;
+  }).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--muted);">Нет позиций</td></tr>';
   document.getElementById('saleDetailSubtotal').textContent = formatMoney(subtotal);
   document.getElementById('saleDetailDiscount').textContent = formatMoney(s.Discount || 0);
   document.getElementById('saleDetailTotal').textContent = formatMoney(s.Total);

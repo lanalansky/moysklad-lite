@@ -1,6 +1,8 @@
 const state = { products: [], contacts: [], orders: [], inventories: [], sales: [], payments: [], services: [], repackRecipes: [] };
 let selectedGroupPath = null; // null = "Товары и услуги" (без своей папки)
 let expandedGroups = new Set();
+let editingSaleId = null;
+let editingSaleProvider = '';
 
 const statusEl = document.getElementById('status');
 
@@ -1168,9 +1170,12 @@ function saleMethodLabel(s) {
   return 'Наличными';
 }
 
+let saleDetailOpenId = null;
+
 function openSaleDetail(id) {
   const s = state.sales.find(x => x.ID === id);
   if (!s) return;
+  saleDetailOpenId = id;
   const subtotal = (s.Items || []).reduce((sum, i) => sum + Number(i.qty) * Number(i.price), 0);
   document.getElementById('saleDetailMeta').textContent =
     formatDate(s.Date) + ' · ' + saleMethodLabel(s) + (s.Comment ? ' · ' + s.Comment : '');
@@ -1187,6 +1192,40 @@ function openSaleDetail(id) {
   document.getElementById('saleDetailTotal').textContent = formatMoney(s.Total);
   openModal('saleDetailModal');
 }
+
+function openSaleEditForm(id) {
+  const s = state.sales.find(x => x.ID === id);
+  if (!s) return;
+  editingSaleId = s.ID;
+  editingSaleProvider = s.Provider || '';
+  closeModal('saleDetailModal');
+
+  document.querySelectorAll('#saleItemsBody .item-product-suggestions').forEach(el => el.remove());
+  document.getElementById('saleItemsBody').innerHTML = '';
+  (s.Items || []).forEach(() => addSaleItemRow());
+  const rows = document.querySelectorAll('#saleItemsBody tr');
+  (s.Items || []).forEach((it, idx) => {
+    const row = rows[idx];
+    const product = state.products.find(p => p.ID === it.productId) || state.services.find(p => p.ID === it.productId);
+    row.querySelector('.item-product-id').value = it.productId;
+    row.querySelector('.item-product-search').value = product ? product.Name : (it.name || '');
+    row.querySelector('.item-qty').value = it.qty;
+    row.querySelector('.item-price').value = it.price;
+    row.querySelector('.item-sum').textContent = formatMoney(it.qty * it.price);
+  });
+  document.getElementById('saleDiscount').value = s.Discount || 0;
+  document.getElementById('saleComment').value = s.Comment || '';
+  refreshSaleTotalsDisplay();
+  document.getElementById('saleCash').value = Number(s.CashAmount || 0).toFixed(2);
+  document.getElementById('saleCard').value = Number(s.CardAmount || 0).toFixed(2);
+  document.getElementById('saleModalTitle').textContent = 'Редактирование продажи';
+  document.getElementById('saveSaleBtn').textContent = 'Сохранить изменения';
+  openModal('saleModal');
+}
+
+document.getElementById('saleDetailEditBtn').addEventListener('click', () => {
+  if (saleDetailOpenId) openSaleEditForm(saleDetailOpenId);
+});
 
 document.getElementById('salesBody').addEventListener('click', async (e) => {
   const delId = e.target.dataset.deleteSale;
@@ -1206,7 +1245,10 @@ function addSaleItemRow() {
   createProductPickerRow('saleItemsBody', p => p.Price, updateSaleTotal, () => state.products.concat(state.services));
 }
 
-function updateSaleTotal() {
+// Recomputes the subtotal/discount/total labels only, without touching the
+// cash/card split — used to show an existing sale's totals when opening it
+// for editing, so its original payment split isn't clobbered on load.
+function refreshSaleTotalsDisplay() {
   const rows = document.querySelectorAll('#saleItemsBody tr');
   let subtotal = 0;
   rows.forEach(row => {
@@ -1219,6 +1261,11 @@ function updateSaleTotal() {
   document.getElementById('saleSubtotal').textContent = formatMoney(subtotal);
   document.getElementById('saleDiscountTotal').textContent = formatMoney(discount);
   document.getElementById('saleTotal').textContent = formatMoney(total);
+}
+
+function updateSaleTotal() {
+  refreshSaleTotalsDisplay();
+  const total = Number(document.getElementById('saleTotal').textContent.replace(/\s/g, '').replace(',', '.')) || 0;
   document.getElementById('saleCash').value = total.toFixed(2);
   document.getElementById('saleCard').value = '0.00';
 }
@@ -1239,6 +1286,10 @@ document.getElementById('saleCard').addEventListener('input', () => {
 });
 
 document.getElementById('addSaleBtn').addEventListener('click', () => {
+  editingSaleId = null;
+  editingSaleProvider = '';
+  document.getElementById('saleModalTitle').textContent = 'Новая продажа';
+  document.getElementById('saveSaleBtn').textContent = 'Провести продажу';
   document.querySelectorAll('#saleItemsBody .item-product-suggestions').forEach(el => el.remove());
   document.getElementById('saleItemsBody').innerHTML = '';
   document.getElementById('saleDiscount').value = 0;
@@ -1268,7 +1319,14 @@ guardClick('saveSaleBtn', async () => {
     cardAmount: Number(document.getElementById('saleCard').value) || 0,
     comment: document.getElementById('saleComment').value.trim()
   };
-  await api('addSale', payload);
+  if (editingSaleId) {
+    payload.id = editingSaleId;
+    payload.provider = editingSaleProvider;
+    await api('editSale', payload);
+    editingSaleId = null;
+  } else {
+    await api('addSale', payload);
+  }
   closeModal('saleModal');
   await loadAll();
 });

@@ -264,6 +264,11 @@ main { padding: 24px; }
 
 .modal.open { display: flex; }
 
+/* Can be opened nested over the order/sale modal (creating a missing
+   product without losing the document in progress), so it must paint
+   above every other modal regardless of DOM order. */
+#productModal { z-index: 60; }
+
 .modal-content {
   background: var(--panel);
   padding: 24px;

@@ -3,6 +3,9 @@ let selectedGroupPath = null; // null = "Товары и услуги" (без �
 let expandedGroups = new Set();
 let editingSaleId = null;
 let editingSaleProvider = '';
+// Set while the full product-create modal was opened from an order/sale item
+// picker (instead of the Товары tab), so saving it also fills that row.
+let pendingProductPick = null;
 
 const statusEl = document.getElementById('status');
 
@@ -146,7 +149,10 @@ try {
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 document.querySelectorAll('[data-close]').forEach(btn => {
-  btn.addEventListener('click', () => closeModal(btn.dataset.close));
+  btn.addEventListener('click', () => {
+    closeModal(btn.dataset.close);
+    if (btn.dataset.close === 'productModal') pendingProductPick = null;
+  });
 });
 
 // ---- Products ----
@@ -311,6 +317,7 @@ function fillProductForm(p) {
 }
 
 document.getElementById('addProductBtn').addEventListener('click', () => {
+  pendingProductPick = null;
   document.getElementById('productModalTitle').textContent = 'Новый товар';
   fillProductForm({ Group: selectedGroupPath || '' });
   openModal('productModal');
@@ -359,9 +366,15 @@ guardClick('saveProductBtn', async () => {
   };
   if (!payload.name) { alert('Укажите название'); return; }
   if (costPriceInput.value === '') { alert('Укажите закупочную цену'); costPriceInput.focus(); return; }
-  await api(id ? 'updateProduct' : 'addProduct', payload);
+  const saved = await api(id ? 'updateProduct' : 'addProduct', payload);
   closeModal('productModal');
   await loadAll();
+  if (pendingProductPick) {
+    const pick = pendingProductPick;
+    pendingProductPick = null;
+    const fresh = state.products.find(p => p.ID === saved.ID) || saved;
+    pick(fresh);
+  }
 });
 
 // ---- Services (аренда, штрафы и пр. — продаются как товар, без остатка) ----
@@ -791,26 +804,19 @@ function createProductPickerRow(containerId, priceFn, onChange, getItems) {
     updateRowSum();
   }
 
-  // Lets a not-yet-catalogued item be added without leaving the order/sale
-  // form: creates a bare product (just the name) and selects it immediately,
-  // so its real price/stock can be filled in on its own card later.
+  // Lets a not-yet-catalogued item be added without losing the order/sale in
+  // progress: opens the full product card (group, prices, etc.) pre-filled
+  // with the typed name; saving it there selects the new product into this
+  // row, same as picking an existing one.
   function wireCreateOption(name) {
     const el = suggestBox.querySelector('[data-create]');
     if (!el || !name) return;
-    el.addEventListener('click', async () => {
-      if (el.dataset.busy) return;
-      el.dataset.busy = '1';
-      const original = el.textContent;
-      el.textContent = 'Создание…';
-      try {
-        const p = await api('addProduct', { name });
-        state.products.push(p);
-        selectProduct(p);
-      } catch (err) {
-        alert('Не удалось создать товар: ' + err.message);
-        el.textContent = original;
-        delete el.dataset.busy;
-      }
+    el.addEventListener('click', () => {
+      suggestBox.hidden = true;
+      document.getElementById('productModalTitle').textContent = 'Новый товар';
+      fillProductForm({ Name: name });
+      pendingProductPick = selectProduct;
+      openModal('productModal');
     });
   }
 

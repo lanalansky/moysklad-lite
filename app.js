@@ -651,7 +651,10 @@ const ORDER_STATUS_LABELS = { draft: 'Черновик', completed: 'Приня�
 
 function renderOrders() {
   const body = document.getElementById('ordersBody');
-  body.innerHTML = state.orders.slice().reverse().map(o => `
+  // Sort by Date explicitly (not insertion order) so accepting a draft never
+  // moves it in the list — only its own Date decides its position.
+  const sorted = state.orders.slice().sort((a, b) => new Date(b.Date) - new Date(a.Date));
+  body.innerHTML = sorted.map(o => `
     <tr class="clickable-row" data-open-order="${o.ID}">
       <td>${formatDate(o.Date)}</td>
       <td>${escapeHtml(o.ContactName)}</td>

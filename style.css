@@ -496,7 +496,7 @@ main { padding: 24px; }
 .turnover-table .out-cell { color: #b3261e; }
 
 /* ---- Repack (короб -> поштучно) ---- */
-.panel-head h2 + .hint, .panel-head p.hint { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+.panel-head h2 + .hint, .panel-head p.hint, .modal-content p.hint { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
 
 .recipe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
 
@@ -602,6 +602,10 @@ tfoot td { font-weight: 700; background: #f0f4fb; border-top: 2px solid var(--bo
 .pill { font-size: 12px; padding: 3px 10px; border-radius: 999px; font-weight: 600; }
 .pill.in { background: #eaf6ec; color: #1a7f37; }
 .pill.out { background: #fbe9e8; color: #b3261e; }
+
+.order-status { font-size: 12px; padding: 3px 10px; border-radius: 999px; font-weight: 600; }
+.order-status.draft { background: #fff4e5; color: #b36b00; }
+.order-status.completed { background: #eaf6ec; color: #1a7f37; }
 .amt-in { color: #1a7f37; font-weight: 600; }
 .amt-out { color: #b3261e; font-weight: 600; }
 

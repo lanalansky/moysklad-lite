@@ -100,6 +100,7 @@ function doPost(e) {
       case 'deleteContact': result = deleteContact(payload); break;
       case 'addOrder': result = addOrder(payload); break;
       case 'updateOrderStatus': result = updateOrderStatus(payload); break;
+      case 'completeOrder': result = completeOrder(payload); break;
       case 'deleteOrder': result = deleteOrder(payload); break;
       case 'getTurnover': result = getTurnover(payload); break;
       case 'getStockAsOf': result = getStockAsOf(payload); break;
@@ -521,6 +522,10 @@ function computeLandedItems(items, delivery) {
   });
 }
 
+// A purchase order is logged as a 'draft' first (so placing the order with a
+// supplier doesn't also silently change stock) and only moves inventory once
+// completeOrder() marks it 'completed' - mirroring order vs. receiving in
+// real МойСклад.
 function addOrder(o) {
   var sheet = ordersSheet();
   var contact = null;
@@ -533,12 +538,14 @@ function addOrder(o) {
   var items = computeLandedItems(o.items || [], delivery);
   var obj = {
     ID: newId(), Date: new Date(), ContactID: o.contactId || '', ContactName: contact ? contact.Name : '',
-    Type: o.type || 'purchase', Status: o.status || 'completed', ItemsJSON: JSON.stringify(items),
+    Type: o.type || 'purchase', Status: o.status || 'draft', ItemsJSON: JSON.stringify(items),
     Delivery: delivery, Total: subtotal + delivery
   };
   sheet.appendRow(ORDERS_HEADERS.map(function (h) { return obj[h]; }));
-  var refLabel = (obj.Type === 'purchase' ? 'Закупка' : 'Продажа') + (contact ? ' — ' + contact.Name : '');
-  applyStockDelta(items, 1, obj.Type, obj.ID, refLabel);
+  if (obj.Status === 'completed') {
+    var refLabel = (obj.Type === 'purchase' ? 'Закупка' : 'Продажа') + (contact ? ' — ' + contact.Name : '');
+    applyStockDelta(items, 1, obj.Type, obj.ID, refLabel);
+  }
   obj.Items = items;
   return obj;
 }
@@ -552,6 +559,29 @@ function updateOrderStatus(o) {
   return { orderId: o.orderId, status: o.status };
 }
 
+// Marks a draft order as received: applies its stock/cost delta exactly once,
+// then flips Status to 'completed'. Re-completing an already-completed order
+// is a no-op so a retried request can't double-count stock.
+function completeOrder(o) {
+  var sheet = ordersSheet();
+  var row = findRowById(sheet, o.orderId);
+  if (row === -1) throw new Error('Заказ не найден');
+  var data = sheet.getRange(row, 1, 1, ORDERS_HEADERS.length).getValues()[0];
+  var order = {};
+  ORDERS_HEADERS.forEach(function (h, i) { order[h] = data[i]; });
+  if (order.Status === 'completed') return order;
+
+  var items = JSON.parse(order.ItemsJSON || '[]');
+  var refLabel = (order.Type === 'purchase' ? 'Закупка' : 'Продажа') + (order.ContactName ? ' — ' + order.ContactName : '');
+  applyStockDelta(items, 1, order.Type, order.ID, refLabel);
+
+  var statusCol = ORDERS_HEADERS.indexOf('Status') + 1;
+  sheet.getRange(row, statusCol).setValue('completed');
+  order.Status = 'completed';
+  order.Items = items;
+  return order;
+}
+
 function deleteOrder(o) {
   var sheet = ordersSheet();
   var row = findRowById(sheet, o.orderId);
@@ -559,8 +589,12 @@ function deleteOrder(o) {
   var data = sheet.getRange(row, 1, 1, ORDERS_HEADERS.length).getValues()[0];
   var itemsJSON = data[ORDERS_HEADERS.indexOf('ItemsJSON')];
   var type = data[ORDERS_HEADERS.indexOf('Type')];
+  var status = data[ORDERS_HEADERS.indexOf('Status')];
   var items = JSON.parse(itemsJSON || '[]');
-  applyStockDelta(items, -1, type, o.orderId, 'Удаление заказа');
+  // A draft never touched stock, so deleting it shouldn't reverse anything.
+  if (status === 'completed') {
+    applyStockDelta(items, -1, type, o.orderId, 'Удаление заказа');
+  }
   sheet.deleteRow(row);
   return { id: o.orderId };
 }

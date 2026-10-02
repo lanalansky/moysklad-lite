@@ -628,15 +628,18 @@ guardClick('saveContactBtn', async () => {
 });
 
 // ---- Orders (заказы поставщикам) ----
+const ORDER_STATUS_LABELS = { draft: 'Черновик', completed: 'Принят' };
+
 function renderOrders() {
   const body = document.getElementById('ordersBody');
   body.innerHTML = state.orders.slice().reverse().map(o => `
     <tr>
       <td>${formatDate(o.Date)}</td>
       <td>${escapeHtml(o.ContactName)}</td>
-      <td>${escapeHtml(o.Status)}</td>
+      <td><span class="order-status ${o.Status}">${escapeHtml(ORDER_STATUS_LABELS[o.Status] || o.Status)}</span></td>
       <td>${formatMoney(o.Total)}</td>
       <td class="actions">
+        ${o.Status === 'draft' ? `<button class="btn primary" data-complete-order="${o.ID}">Принять</button>` : ''}
         <button class="btn danger" data-delete-order="${o.ID}">Удалить</button>
       </td>
     </tr>
@@ -644,9 +647,19 @@ function renderOrders() {
 }
 
 document.getElementById('ordersBody').addEventListener('click', async (e) => {
+  const completeId = e.target.dataset.completeOrder;
+  if (completeId) {
+    await api('completeOrder', { orderId: completeId });
+    await loadAll();
+    return;
+  }
   const delId = e.target.dataset.deleteOrder;
   if (delId) {
-    if (!confirm('Удалить заказ? Остатки на складе будут возвращены.')) return;
+    const order = state.orders.find(o => o.ID === delId);
+    const msg = order && order.Status === 'completed'
+      ? 'Удалить заказ? Остатки на складе будут возвращены.'
+      : 'Удалить черновик заказа?';
+    if (!confirm(msg)) return;
     await api('deleteOrder', { orderId: delId });
     await loadAll();
   }

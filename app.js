@@ -176,6 +176,9 @@ document.addEventListener('click', (e) => {
   openProductDetail(link.dataset.openProduct);
 }, true);
 
+let productDetailRows = []; // full, unfiltered history for the currently-open product
+let productDetailSortAsc = false; // newest first by default
+
 function openProductDetail(productId) {
   const isService = state.services.some(x => x.ID === productId);
   const p = state.products.find(x => x.ID === productId) || state.services.find(x => x.ID === productId);
@@ -205,7 +208,29 @@ function openProductDetail(productId) {
       }
     });
   });
-  rows.sort((a, b) => new Date(b.date) - new Date(a.date));
+  productDetailRows = rows;
+  document.getElementById('productDetailFrom').value = '';
+  document.getElementById('productDetailTo').value = '';
+  productDetailSortAsc = false;
+  document.getElementById('productDetailSortArrow').textContent = '▼';
+  renderProductDetailHistory();
+
+  openModal('productDetailModal');
+}
+
+function renderProductDetailHistory() {
+  const fromVal = document.getElementById('productDetailFrom').value;
+  const toVal = document.getElementById('productDetailTo').value;
+  const from = fromVal ? new Date(fromVal + 'T00:00:00') : null;
+  const to = toVal ? new Date(toVal + 'T23:59:59') : null;
+  const rows = productDetailRows.filter(r => {
+    const d = new Date(r.date);
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    return true;
+  });
+  rows.sort((a, b) => productDetailSortAsc ? new Date(a.date) - new Date(b.date) : new Date(b.date) - new Date(a.date));
+
   document.getElementById('productDetailHistoryBody').innerHTML = rows.map(r => `
     <tr>
       <td>${formatDate(r.date)}</td>
@@ -217,8 +242,19 @@ function openProductDetail(productId) {
     </tr>
   `).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);">Нет операций</td></tr>';
 
-  openModal('productDetailModal');
+  const totalQty = rows.reduce((sum, r) => sum + Number(r.qty), 0);
+  const totalSum = rows.reduce((sum, r) => sum + Number(r.qty) * Number(r.price), 0);
+  document.getElementById('productDetailHistoryTotals').innerHTML = rows.length
+    ? `<td colspan="3">Итого (${rows.length})</td><td>${totalQty}</td><td></td><td>${formatMoney(totalSum)}</td>`
+    : '';
 }
+
+document.getElementById('productDetailShowBtn').addEventListener('click', renderProductDetailHistory);
+document.getElementById('productDetailSortDate').addEventListener('click', () => {
+  productDetailSortAsc = !productDetailSortAsc;
+  document.getElementById('productDetailSortArrow').textContent = productDetailSortAsc ? '▲' : '▼';
+  renderProductDetailHistory();
+});
 
 // ---- Products ----
 

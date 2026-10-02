@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MoySkladLite</title>
-<link rel="stylesheet" href="style.css?v=26">
+<link rel="stylesheet" href="style.css?v=27">
 </head>
 <body>
 <header class="topbar">
@@ -375,9 +375,18 @@
       </div>
     </div>
     <div class="section-label">История</div>
+    <div class="filters" style="margin-bottom:12px;">
+      <div class="field"><label>Период с</label><input type="date" id="productDetailFrom"></div>
+      <div class="field"><label>по</label><input type="date" id="productDetailTo"></div>
+      <button class="btn primary" id="productDetailShowBtn">Показать</button>
+    </div>
     <table class="data-table" style="margin-bottom:12px;">
-      <thead><tr><th>Дата</th><th>Тип</th><th>Контрагент / комментарий</th><th>Кол-во</th><th>Цена</th><th>Сумма</th></tr></thead>
+      <thead><tr>
+        <th id="productDetailSortDate" style="cursor:pointer;user-select:none;">Дата <span id="productDetailSortArrow">▼</span></th>
+        <th>Тип</th><th>Контрагент / комментарий</th><th>Кол-во</th><th>Цена</th><th>Сумма</th>
+      </tr></thead>
       <tbody id="productDetailHistoryBody"></tbody>
+      <tfoot><tr id="productDetailHistoryTotals"></tr></tfoot>
     </table>
     <div class="modal-actions">
       <button class="btn" data-close="productDetailModal">Закрыть</button>
@@ -519,7 +528,7 @@
   </div>
 </div>
 
-<script src="config.js?v=26"></script>
-<script src="app.js?v=26"></script>
+<script src="config.js?v=27"></script>
+<script src="app.js?v=27"></script>
 </body>
 </html>

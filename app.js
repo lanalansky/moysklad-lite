@@ -783,14 +783,48 @@ function createProductPickerRow(containerId, priceFn, onChange, getItems) {
     suggestBox.style.width = rect.width + 'px';
   }
 
+  function selectProduct(p) {
+    idInput.value = p.ID;
+    searchInput.value = p.Name;
+    suggestBox.hidden = true;
+    priceInput.value = priceFn(p) || 0;
+    updateRowSum();
+  }
+
+  // Lets a not-yet-catalogued item be added without leaving the order/sale
+  // form: creates a bare product (just the name) and selects it immediately,
+  // so its real price/stock can be filled in on its own card later.
+  function wireCreateOption(name) {
+    const el = suggestBox.querySelector('[data-create]');
+    if (!el || !name) return;
+    el.addEventListener('click', async () => {
+      if (el.dataset.busy) return;
+      el.dataset.busy = '1';
+      const original = el.textContent;
+      el.textContent = 'Создание…';
+      try {
+        const p = await api('addProduct', { name });
+        state.products.push(p);
+        selectProduct(p);
+      } catch (err) {
+        alert('Не удалось создать товар: ' + err.message);
+        el.textContent = original;
+        delete el.dataset.busy;
+      }
+    });
+  }
+
   function showProductSuggestions(query) {
     const q = query.trim().toLowerCase();
     if (!q) { suggestBox.hidden = true; return; }
     positionSuggestBox();
     const matches = searchProducts(getItems(), query, 20);
+    const name = query.trim();
+    const createRow = `<div class="picker-suggestion picker-create" data-create>+ Создать «${escapeHtml(name)}»</div>`;
     if (!matches.length) {
-      suggestBox.innerHTML = '<div class="picker-suggestion" style="color:var(--muted);">Не найдено</div>';
+      suggestBox.innerHTML = '<div class="picker-suggestion" style="color:var(--muted);">Не найдено</div>' + createRow;
       suggestBox.hidden = false;
+      wireCreateOption(name);
       return;
     }
     suggestBox.innerHTML = matches.map((p, i) => `
@@ -798,18 +832,12 @@ function createProductPickerRow(containerId, priceFn, onChange, getItems) {
         <span>${escapeHtml(p.Name)}</span>
         <span class="kind">${escapeHtml(p.Code || p.Article || '')} · ${p.Quantity === undefined ? 'услуга' : 'ост. ' + p.Quantity}</span>
       </div>
-    `).join('');
+    `).join('') + createRow;
     suggestBox.hidden = false;
     suggestBox.querySelectorAll('.picker-suggestion[data-idx]').forEach((el, i) => {
-      el.addEventListener('click', () => {
-        const p = matches[i];
-        idInput.value = p.ID;
-        searchInput.value = p.Name;
-        suggestBox.hidden = true;
-        priceInput.value = priceFn(p) || 0;
-        updateRowSum();
-      });
+      el.addEventListener('click', () => selectProduct(matches[i]));
     });
+    wireCreateOption(name);
   }
 
   searchInput.addEventListener('input', () => showProductSuggestions(searchInput.value));

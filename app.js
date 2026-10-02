@@ -633,7 +633,7 @@ const ORDER_STATUS_LABELS = { draft: 'Черновик', completed: 'Приня�
 function renderOrders() {
   const body = document.getElementById('ordersBody');
   body.innerHTML = state.orders.slice().reverse().map(o => `
-    <tr>
+    <tr class="clickable-row" data-open-order="${o.ID}">
       <td>${formatDate(o.Date)}</td>
       <td>${escapeHtml(o.ContactName)}</td>
       <td><span class="order-status ${o.Status}">${escapeHtml(ORDER_STATUS_LABELS[o.Status] || o.Status)}</span></td>
@@ -644,6 +644,32 @@ function renderOrders() {
       </td>
     </tr>
   `).join('');
+}
+
+function orderItemName(productId) {
+  const p = state.products.find(x => x.ID === productId) || state.services.find(x => x.ID === productId);
+  return p ? p.Name : '(товар удалён)';
+}
+
+function openOrderDetail(id) {
+  const o = state.orders.find(x => x.ID === id);
+  if (!o) return;
+  const items = o.Items || [];
+  const subtotal = items.reduce((sum, i) => sum + Number(i.qty) * Number(i.price), 0);
+  document.getElementById('orderDetailMeta').textContent =
+    formatDate(o.Date) + (o.ContactName ? ' · ' + o.ContactName : '') + ' · ' + (ORDER_STATUS_LABELS[o.Status] || o.Status);
+  document.getElementById('orderDetailItemsBody').innerHTML = items.map(it => `
+    <tr>
+      <td>${escapeHtml(orderItemName(it.productId))}</td>
+      <td>${it.qty}</td>
+      <td>${formatMoney(it.price)}</td>
+      <td>${formatMoney(it.qty * it.price)}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--muted);">Нет позиций</td></tr>';
+  document.getElementById('orderDetailSubtotal').textContent = formatMoney(subtotal);
+  document.getElementById('orderDetailDelivery').textContent = formatMoney(o.Delivery || 0);
+  document.getElementById('orderDetailTotal').textContent = formatMoney(o.Total);
+  openModal('orderDetailModal');
 }
 
 document.getElementById('ordersBody').addEventListener('click', async (e) => {
@@ -662,7 +688,10 @@ document.getElementById('ordersBody').addEventListener('click', async (e) => {
     if (!confirm(msg)) return;
     await api('deleteOrder', { orderId: delId });
     await loadAll();
+    return;
   }
+  const openId = e.target.closest('tr[data-open-order]')?.dataset.openOrder;
+  if (openId) openOrderDetail(openId);
 });
 
 document.getElementById('addOrderBtn').addEventListener('click', () => {

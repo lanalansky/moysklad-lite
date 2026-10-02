@@ -649,6 +649,19 @@ guardClick('saveContactBtn', async () => {
 // ---- Orders (заказы поставщикам) ----
 const ORDER_STATUS_LABELS = { draft: 'Черновик', completed: 'Принят' };
 
+function truncateText(s, n) {
+  return s.length > n ? s.slice(0, n - 1) + '…' : s;
+}
+
+// Short "what's in this order" preview for the orders list, so the contents
+// are visible at a glance without opening the detail modal.
+function orderItemsPreview(o) {
+  const items = o.Items || [];
+  if (!items.length) return '';
+  const names = items.map(it => truncateText(orderItemName(it.productId), 15));
+  return truncateText(names.join(', '), 60);
+}
+
 function renderOrders() {
   const body = document.getElementById('ordersBody');
   // Sort by Date explicitly (not insertion order) so accepting a draft never
@@ -658,6 +671,7 @@ function renderOrders() {
     <tr class="clickable-row" data-open-order="${o.ID}">
       <td>${formatDate(o.Date)}</td>
       <td>${escapeHtml(o.ContactName)}</td>
+      <td style="color:var(--muted);font-size:13px;">${escapeHtml(orderItemsPreview(o))}</td>
       <td><span class="order-status ${o.Status}">${escapeHtml(ORDER_STATUS_LABELS[o.Status] || o.Status)}</span></td>
       <td>${formatMoney(o.Total)}</td>
       <td class="actions">

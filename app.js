@@ -1224,6 +1224,85 @@ function renderStock() {
 document.getElementById('stockShowBtn').addEventListener('click', showStock);
 document.getElementById('stockFilterSelect').addEventListener('change', renderStock);
 
+// Printable inventory-count sheet: same scope (date/group/product filters)
+// as the on-screen Остатки report, but always drops zero-stock rows — a
+// blank "Факт" column is included for writing the physically counted qty
+// by hand, to transcribe into Инвентаризация afterwards.
+function printStockReport() {
+  const products = stockSnapshot || state.products;
+  const sel = stockPicker.getSelected();
+  const productIds = sel.filter(s => s.type === 'product').map(s => s.id);
+  const groups = sel.filter(s => s.type === 'group').map(s => s.id);
+
+  let filtered = products;
+  if (productIds.length || groups.length) {
+    filtered = filtered.filter(p => productIds.includes(p.ID) || groups.includes(p.Group));
+  }
+  filtered = filtered.filter(p => Number(p.Quantity) !== 0);
+
+  const groupsMap = {};
+  filtered.forEach(p => { (groupsMap[p.Group || 'Без группы'] = groupsMap[p.Group || 'Без группы'] || []).push(p); });
+  const groupNames = Object.keys(groupsMap).sort((a, b) => a.localeCompare(b, 'ru'));
+
+  let n = 0;
+  const totals = { qty: 0, costSum: 0, saleSum: 0 };
+  let rowsHtml = '';
+  groupNames.forEach(g => {
+    rowsHtml += `<tr class="grp"><td colspan="7">${escapeHtml(g)}</td></tr>`;
+    groupsMap[g].slice().sort((a, b) => a.Name.localeCompare(b.Name, 'ru')).forEach(p => {
+      n++;
+      const qty = Number(p.Quantity);
+      const costSum = qty * Number(p.CostPrice || 0);
+      const saleSum = qty * Number(p.Price || 0);
+      totals.qty += qty; totals.costSum += costSum; totals.saleSum += saleSum;
+      rowsHtml += `<tr>
+        <td>${n}</td><td>${escapeHtml(p.Name)}</td><td>${escapeHtml(p.Unit)}</td>
+        <td class="num">${qty}</td><td class="fact"></td>
+        <td class="num">${formatMoney(p.CostPrice)}</td><td class="num">${formatMoney(p.Price)}</td>
+      </tr>`;
+    });
+  });
+
+  const asOfLabel = stockSnapshot ? ('на ' + formatDate(document.getElementById('stockAsOf').value)) : ('на ' + new Date().toLocaleString('ru-RU'));
+  const html = `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
+<title>Остатки — инвентаризация</title>
+<style>
+  @page { size: A4; margin: 12mm; }
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 11px; color: #000; margin: 0; }
+  h1 { font-size: 16px; margin: 0 0 4px; }
+  .meta { font-size: 11px; color: #555; margin-bottom: 10px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { border: 1px solid #999; padding: 3px 6px; text-align: left; }
+  th { background: #eee; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  td.fact { width: 60px; }
+  tr.grp td { background: #f2f2f2; font-weight: bold; }
+  tfoot td { font-weight: bold; border-top: 2px solid #000; }
+  @media print { tr.grp, tr { break-inside: avoid; } }
+</style>
+</head><body>
+  <h1>Остатки товаров (${asOfLabel})</h1>
+  <div class="meta">Позиций: ${n} · нулевые остатки не включены · столбец «Факт» — для ручной записи при пересчёте</div>
+  <table>
+    <thead><tr><th>№</th><th>Наименование</th><th>Ед.</th><th class="num">Остаток</th><th class="num">Факт</th><th class="num">Закуп.</th><th class="num">Продажа</th></tr></thead>
+    <tbody>${rowsHtml}</tbody>
+    <tfoot><tr>
+      <td colspan="3">Итого (${n})</td><td class="num">${totals.qty}</td><td></td>
+      <td class="num">${formatMoney(totals.costSum)}</td><td class="num">${formatMoney(totals.saleSum)}</td>
+    </tr></tfoot>
+  </table>
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  if (!w) { alert('Браузер заблокировал открытие окна печати — разрешите всплывающие окна для этого сайта.'); return; }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+  w.onload = () => { w.focus(); w.print(); };
+}
+
+document.getElementById('stockPrintBtn').addEventListener('click', printStockReport);
+
 // ---- Warehouse: Инвентаризации ----
 let countItems = [];
 

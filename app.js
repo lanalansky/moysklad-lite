@@ -1248,7 +1248,7 @@ function printStockReport() {
   const totals = { qty: 0, costSum: 0, saleSum: 0 };
   let rowsHtml = '';
   groupNames.forEach(g => {
-    rowsHtml += `<tr class="grp"><td colspan="7">${escapeHtml(g)}</td></tr>`;
+    rowsHtml += `<tr class="grp"><td colspan="5">${escapeHtml(g)}</td></tr>`;
     groupsMap[g].slice().sort((a, b) => a.Name.localeCompare(b.Name, 'ru')).forEach(p => {
       n++;
       const qty = Number(p.Quantity);
@@ -1258,7 +1258,6 @@ function printStockReport() {
       rowsHtml += `<tr>
         <td>${n}</td><td>${escapeHtml(p.Name)}</td><td>${escapeHtml(p.Unit)}</td>
         <td class="num">${qty}</td><td class="fact"></td>
-        <td class="num">${formatMoney(p.CostPrice)}</td><td class="num">${formatMoney(p.Price)}</td>
       </tr>`;
     });
   });
@@ -1284,12 +1283,12 @@ function printStockReport() {
   <h1>Остатки товаров (${asOfLabel})</h1>
   <div class="meta">Позиций: ${n} · нулевые остатки не включены · столбец «Факт» — для ручной записи при пересчёте</div>
   <table>
-    <thead><tr><th>№</th><th>Наименование</th><th>Ед.</th><th class="num">Остаток</th><th class="num">Факт</th><th class="num">Закуп.</th><th class="num">Продажа</th></tr></thead>
+    <thead><tr><th>№</th><th>Наименование</th><th>Ед.</th><th class="num">Остаток</th><th class="num">Факт</th></tr></thead>
     <tbody>${rowsHtml}</tbody>
-    <tfoot><tr>
-      <td colspan="3">Итого (${n})</td><td class="num">${totals.qty}</td><td></td>
-      <td class="num">${formatMoney(totals.costSum)}</td><td class="num">${formatMoney(totals.saleSum)}</td>
-    </tr></tfoot>
+    <tfoot>
+      <tr><td colspan="3">Итого (${n})</td><td class="num">${totals.qty}</td><td></td></tr>
+      <tr><td colspan="5">Сумма закупки: ${formatMoney(totals.costSum)} · Сумма продажи: ${formatMoney(totals.saleSum)}</td></tr>
+    </tfoot>
   </table>
 </body></html>`;
 

@@ -11,7 +11,7 @@ const statusEl = document.getElementById('status');
 
 // Read-only actions are safe to retry as-is; everything else gets an
 // idempotency key (see generateIdempotencyKey) so a retry can't double-write.
-const READ_ONLY_ACTIONS = new Set(['getAll', 'getTurnover', 'getStockAsOf', 'getPnl']);
+const READ_ONLY_ACTIONS = new Set(['getAll', 'getTurnover', 'getStockAsOf', 'getPnl', 'getMovementsLog']);
 
 // Generated once per logical call, before the retry loop, so every retry of
 // the same call reuses the same key and the server can recognize it as a

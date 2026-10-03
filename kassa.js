@@ -672,7 +672,6 @@ if (!CONFIG.API_URL || CONFIG.API_URL.startsWith('PASTE_')) {
       if (savedTab && document.getElementById('view-' + savedTab)) setActiveKassaTab(savedTab);
     } catch (e) {}
   });
-  setInterval(() => loadAll(true), 3 * 60 * 1000);
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});
   }

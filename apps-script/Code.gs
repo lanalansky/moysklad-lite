@@ -118,61 +118,78 @@ function doGet(e) {
   return jsonResponse({ ok: true, message: 'MoySkladLite API is running' });
 }
 
+// Actions that only read sheets (never append/setValue/deleteRow) don't need
+// the script lock: they don't need mutual exclusion with each other, and this
+// app tolerates a transient, momentarily-stale read. Keeping them off the
+// lock stops a burst of getAll polling from queuing up behind every write
+// (and behind every other getAll), which is what caused the 20-60s latency.
+var READ_ONLY_ACTIONS = { getAll: 1, getTurnover: 1, getStockAsOf: 1, getPnl: 1, getMovementsLog: 1 };
+
+function dispatchAction(action, payload) {
+  switch (action) {
+    case 'getAll': return getAll();
+    case 'addProduct': return addProduct(payload);
+    case 'updateProduct': return updateProduct(payload);
+    case 'deleteProduct': return deleteProduct(payload);
+    case 'archiveProducts': return archiveProducts(payload);
+    case 'adjustStock': return adjustStock(payload);
+    case 'addContact': return addContact(payload);
+    case 'updateContact': return updateContact(payload);
+    case 'deleteContact': return deleteContact(payload);
+    case 'addOrder': return addOrder(payload);
+    case 'updateOrderStatus': return updateOrderStatus(payload);
+    case 'completeOrder': return completeOrder(payload);
+    case 'deleteOrder': return deleteOrder(payload);
+    case 'getTurnover': return getTurnover(payload);
+    case 'getMovementsLog': return getMovementsLog(payload);
+    case 'getStockAsOf': return getStockAsOf(payload);
+    case 'addInventory': return addInventory(payload);
+    case 'deleteInventory': return deleteInventory(payload);
+    case 'addSale': return addSale(payload);
+    case 'editSale': return editSale(payload);
+    case 'deleteSale': return deleteSale(payload);
+    case 'addPayment': return addPayment(payload);
+    case 'deletePayment': return deletePayment(payload);
+    case 'addHeld': return addHeld(payload);
+    case 'updateHeld': return updateHeld(payload);
+    case 'deleteHeld': return deleteHeld(payload);
+    case 'addService': return addService(payload);
+    case 'updateService': return updateService(payload);
+    case 'deleteService': return deleteService(payload);
+    case 'addRepackRecipe': return addRepackRecipe(payload);
+    case 'deleteRepackRecipe': return deleteRepackRecipe(payload);
+    case 'repackExecute': return repackExecute(payload);
+    case 'getPnl': return getPnl(payload);
+    default: throw new Error('Unknown action: ' + action);
+  }
+}
+
 function doPost(e) {
-  var lock = LockService.getScriptLock();
   try {
-    lock.waitLock(15000);
     var body = JSON.parse(e.postData.contents);
     var action = body.action;
     var payload = body.payload || {};
-    var idemKey = payload._idempotencyKey;
-    if (idemKey) {
-      var cached = findIdempotentResult(idemKey);
-      if (cached !== undefined) return jsonResponse({ ok: true, data: cached });
+
+    if (READ_ONLY_ACTIONS[action]) {
+      return jsonResponse({ ok: true, data: dispatchAction(action, payload) });
     }
-    var result;
-    switch (action) {
-      case 'getAll': result = getAll(); break;
-      case 'addProduct': result = addProduct(payload); break;
-      case 'updateProduct': result = updateProduct(payload); break;
-      case 'deleteProduct': result = deleteProduct(payload); break;
-      case 'archiveProducts': result = archiveProducts(payload); break;
-      case 'adjustStock': result = adjustStock(payload); break;
-      case 'addContact': result = addContact(payload); break;
-      case 'updateContact': result = updateContact(payload); break;
-      case 'deleteContact': result = deleteContact(payload); break;
-      case 'addOrder': result = addOrder(payload); break;
-      case 'updateOrderStatus': result = updateOrderStatus(payload); break;
-      case 'completeOrder': result = completeOrder(payload); break;
-      case 'deleteOrder': result = deleteOrder(payload); break;
-      case 'getTurnover': result = getTurnover(payload); break;
-      case 'getMovementsLog': result = getMovementsLog(payload); break;
-      case 'getStockAsOf': result = getStockAsOf(payload); break;
-      case 'addInventory': result = addInventory(payload); break;
-      case 'deleteInventory': result = deleteInventory(payload); break;
-      case 'addSale': result = addSale(payload); break;
-      case 'editSale': result = editSale(payload); break;
-      case 'deleteSale': result = deleteSale(payload); break;
-      case 'addPayment': result = addPayment(payload); break;
-      case 'deletePayment': result = deletePayment(payload); break;
-      case 'addHeld': result = addHeld(payload); break;
-      case 'updateHeld': result = updateHeld(payload); break;
-      case 'deleteHeld': result = deleteHeld(payload); break;
-      case 'addService': result = addService(payload); break;
-      case 'updateService': result = updateService(payload); break;
-      case 'deleteService': result = deleteService(payload); break;
-      case 'addRepackRecipe': result = addRepackRecipe(payload); break;
-      case 'deleteRepackRecipe': result = deleteRepackRecipe(payload); break;
-      case 'repackExecute': result = repackExecute(payload); break;
-      case 'getPnl': result = getPnl(payload); break;
-      default: throw new Error('Unknown action: ' + action);
+
+    var lock = LockService.getScriptLock();
+    try {
+      lock.waitLock(15000);
+      var idemKey = payload._idempotencyKey;
+      if (idemKey) {
+        var cached = findIdempotentResult(idemKey);
+        if (cached !== undefined) return jsonResponse({ ok: true, data: cached });
+      }
+      var result = dispatchAction(action, payload);
+      if (idemKey) saveIdempotentResult(idemKey, result);
+      return jsonResponse({ ok: true, data: result });
+    } finally {
+      lock.releaseLock();
     }
-    if (idemKey) saveIdempotentResult(idemKey, result);
-    return jsonResponse({ ok: true, data: result });
   } catch (err) {
     return jsonResponse({ ok: false, error: err.message });
-  } finally {
-    lock.releaseLock();
   }
 }
 

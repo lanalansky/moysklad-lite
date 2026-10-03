@@ -91,10 +91,16 @@ function idempotencyKeysSheet() { return getSheet('IdempotencyKeys', IDEMPOTENCY
 // Returns undefined when this key hasn't been seen before.
 function findIdempotentResult(key) {
   var sheet = idempotencyKeysSheet();
-  var row = findRowById(sheet, key);
-  if (row === -1) return undefined;
-  var json = sheet.getRange(row, IDEMPOTENCY_HEADERS.indexOf('ResultJSON') + 1).getValue();
-  return JSON.parse(json);
+  var n = sheet.getLastRow();
+  if (n < 2) return undefined;
+  var keys = sheet.getRange(2, 1, n - 1, 1).getValues();
+  for (var i = keys.length - 1; i >= 0; i--) {
+    if (String(keys[i][0]) === String(key)) {
+      var json = sheet.getRange(i + 2, IDEMPOTENCY_HEADERS.indexOf('ResultJSON') + 1).getValue();
+      return JSON.parse(json);
+    }
+  }
+  return undefined;
 }
 
 function saveIdempotentResult(key, result) {
@@ -107,6 +113,9 @@ function saveIdempotentResult(key, result) {
 // key before a legitimate retry would use it, while keeping the log from
 // growing forever.
 function pruneOldIdempotencyKeys(sheet) {
+  var cache = CacheService.getScriptCache();
+  if (cache.get('idemPruned')) return;
+  cache.put('idemPruned', '1', 3600);
   var cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
   var data = sheet.getDataRange().getValues();
   for (var i = data.length - 1; i >= 1; i--) {

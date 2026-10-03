@@ -1679,9 +1679,24 @@ function renderPayments() {
     if (toDate && d > toDate) return false;
     return true;
   });
-  const sorted = filtered.slice().reverse();
+  const inPeriod = d => {
+    const dt = new Date(d);
+    if (fromDate && dt < fromDate) return false;
+    if (toDate && dt > toDate) return false;
+    return true;
+  };
+  const salesRows = state.sales.filter(s => inPeriod(s.Date)).map(s => ({
+    ID: s.ID, Date: s.Date, Type: 'income', Category: 'Продажа',
+    Amount: Number(s.Total) || 0, Comment: s.Comment || '', RefId: s.ID
+  }));
+  const purchaseRows = state.orders.filter(o => o.Type === 'purchase' && o.Status === 'completed' && inPeriod(o.Date)).map(o => ({
+    ID: o.ID, Date: o.Date, Type: 'expense', Category: 'Закупка',
+    Amount: Number(o.Total) || 0, Comment: o.ContactName || '', RefId: o.ID
+  }));
+  const allRows = [...filtered, ...salesRows, ...purchaseRows].sort((a, b) => new Date(b.Date) - new Date(a.Date));
+
   const body = document.getElementById('paymentsBody');
-  body.innerHTML = sorted.map(p => `
+  body.innerHTML = allRows.map(p => `
     <tr>
       <td>${formatDate(p.Date)}</td>
       <td><span class="pill ${p.Type === 'income' ? 'in' : 'out'}">${paymentTypeLabels[p.Type] || p.Type}</span></td>
@@ -1692,7 +1707,7 @@ function renderPayments() {
     </tr>
   `).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--muted);">Нет платежей за период</td></tr>';
 
-  const totals = filtered.reduce((acc, p) => {
+  const totals = allRows.reduce((acc, p) => {
     if (p.Type === 'income') acc.income += Number(p.Amount) || 0;
     else acc.expense += Number(p.Amount) || 0;
     return acc;

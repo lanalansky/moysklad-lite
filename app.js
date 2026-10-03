@@ -1722,6 +1722,9 @@ function openPaymentModal(type) {
   document.getElementById('paymentCategory').value = '';
   document.getElementById('paymentAmount').value = 0;
   document.getElementById('paymentComment').value = '';
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  document.getElementById('paymentDate').value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
   openModal('paymentModal');
 }
 
@@ -1729,11 +1732,13 @@ document.getElementById('addIncomeBtn').addEventListener('click', () => openPaym
 document.getElementById('addExpenseBtn').addEventListener('click', () => openPaymentModal('expense'));
 
 guardClick('savePaymentBtn', async () => {
+  const dateVal = document.getElementById('paymentDate').value;
   const payload = {
     type: document.getElementById('paymentType').value,
     category: document.getElementById('paymentCategory').value.trim(),
     amount: Number(document.getElementById('paymentAmount').value) || 0,
-    comment: document.getElementById('paymentComment').value.trim()
+    comment: document.getElementById('paymentComment').value.trim(),
+    date: dateVal ? new Date(dateVal).toISOString() : undefined
   };
   if (!payload.category) { alert('Укажите статью'); return; }
   if (!payload.amount) { alert('Укажите сумму'); return; }

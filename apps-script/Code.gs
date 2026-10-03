@@ -402,10 +402,10 @@ function repackExecute(p) {
 }
 
 // ---- Movements (stock history, used by Обороты and Остатки on-date) ----
-function logMovement(productId, productName, delta, type, refId, refLabel) {
+function logMovement(productId, productName, delta, type, refId, refLabel, date) {
   if (!delta) return;
   var sheet = movementsSheet();
-  sheet.appendRow([newId(), new Date(), productId, productName, delta, type, refId || '', refLabel || '']);
+  sheet.appendRow([newId(), date || new Date(), productId, productName, delta, type, refId || '', refLabel || '']);
 }
 
 function movementsByProduct() {
@@ -569,7 +569,7 @@ function deleteInventory(payload) {
 }
 
 // ---- Orders ----
-function applyStockDelta(items, sign, type, refId, refLabel) {
+function applyStockDelta(items, sign, type, refId, refLabel, date) {
   var sheet = productsSheet();
   var qtyCol = PRODUCTS_HEADERS.indexOf('Quantity') + 1;
   var nameCol = PRODUCTS_HEADERS.indexOf('Name') + 1;
@@ -591,7 +591,7 @@ function applyStockDelta(items, sign, type, refId, refLabel) {
     }
     qtyCell.setValue(oldQty + delta);
     var productName = sheet.getRange(row, nameCol).getValue();
-    logMovement(item.productId, productName, delta, type === 'purchase' ? 'purchase' : 'sale', refId, refLabel);
+    logMovement(item.productId, productName, delta, type === 'purchase' ? 'purchase' : 'sale', refId, refLabel, date);
   });
 }
 
@@ -623,15 +623,16 @@ function addOrder(o) {
   var delivery = Number(o.delivery) || 0;
   var subtotal = (o.items || []).reduce(function (sum, i) { return sum + Number(i.qty) * Number(i.price); }, 0);
   var items = computeLandedItems(o.items || [], delivery);
+  var docDate = o.date ? new Date(o.date) : new Date();
   var obj = {
-    ID: newId(), Date: new Date(), ContactID: o.contactId || '', ContactName: contact ? contact.Name : '',
+    ID: newId(), Date: docDate, ContactID: o.contactId || '', ContactName: contact ? contact.Name : '',
     Type: o.type || 'purchase', Status: o.status || 'draft', ItemsJSON: JSON.stringify(items),
     Delivery: delivery, Total: subtotal + delivery
   };
   sheet.appendRow(ORDERS_HEADERS.map(function (h) { return obj[h]; }));
   if (obj.Status === 'completed') {
     var refLabel = (obj.Type === 'purchase' ? 'Закупка' : 'Продажа') + (contact ? ' — ' + contact.Name : '');
-    applyStockDelta(items, 1, obj.Type, obj.ID, refLabel);
+    applyStockDelta(items, 1, obj.Type, obj.ID, refLabel, docDate);
   }
   obj.Items = items;
   return obj;
@@ -695,14 +696,15 @@ function addSale(o) {
   var discount = Number(o.discount) || 0;
   var cashAmount = Number(o.cashAmount) || 0;
   var cardAmount = Number(o.cardAmount) || 0;
+  var docDate = o.date ? new Date(o.date) : new Date();
   var obj = {
-    ID: newId(), Date: new Date(), ItemsJSON: JSON.stringify(items),
+    ID: newId(), Date: docDate, ItemsJSON: JSON.stringify(items),
     CashAmount: cashAmount, CardAmount: cardAmount, Discount: discount,
     Total: subtotal - discount, Comment: o.comment || '', Provider: o.provider || ''
   };
   var sheet = salesSheet();
   sheet.appendRow(SALES_HEADERS.map(function (h) { return obj[h]; }));
-  applyStockDelta(items, 1, 'sale', obj.ID, 'Продажа');
+  applyStockDelta(items, 1, 'sale', obj.ID, 'Продажа', docDate);
   obj.Items = items;
   if (o.heldId) {
     var heldRow = findRowById(heldSheet(), o.heldId);
@@ -790,7 +792,7 @@ function deleteHeld(payload) {
 // ---- Payments (касса: прочие приходы/расходы, не связанные с закупкой товара) ----
 function addPayment(p) {
   var obj = {
-    ID: newId(), Date: new Date(), Type: p.type === 'income' ? 'income' : 'expense',
+    ID: newId(), Date: p.date ? new Date(p.date) : new Date(), Type: p.type === 'income' ? 'income' : 'expense',
     Category: p.category || 'Прочее', Amount: Math.abs(Number(p.amount)) || 0,
     Comment: p.comment || '', RefId: p.refId || '', RefLabel: p.refLabel || ''
   };

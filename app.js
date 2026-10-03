@@ -1303,6 +1303,58 @@ function printStockReport() {
 
 document.getElementById('stockPrintBtn').addEventListener('click', printStockReport);
 
+// ---- Warehouse: Журнал операций ----
+// Full audit trail across every stock-affecting action (sale, purchase,
+// repack, inventory count, manual correction), so a discrepancy can be
+// traced to the exact operation that caused it before anyone is penalized.
+const JOURNAL_TYPE_LABELS = {
+  sale: 'Продажа', purchase: 'Закупка', repack: 'Пересорт',
+  inventory: 'Инвентаризация', correction: 'Ручная правка', adjustment: 'Ручная правка'
+};
+let journalRows = [];
+
+async function showJournal() {
+  const from = document.getElementById('journalFrom').value;
+  const to = document.getElementById('journalTo').value;
+  setStatus('Загрузка...');
+  try {
+    journalRows = await api('getMovementsLog', {
+      dateFrom: from ? new Date(from + 'T00:00:00').toISOString() : null,
+      dateTo: to ? new Date(to + 'T23:59:59').toISOString() : new Date().toISOString()
+    });
+    renderJournal();
+    setStatus('Обновлено: ' + new Date().toLocaleTimeString());
+  } catch (err) {
+    setStatus('Ошибка: ' + err.message, true);
+  }
+}
+
+function renderJournal() {
+  const search = document.getElementById('journalSearch').value.trim().toLowerCase();
+  const typeFilter = document.getElementById('journalTypeSelect').value;
+  let rows = journalRows;
+  if (search) rows = rows.filter(m => (m.ProductName || '').toLowerCase().includes(search));
+  if (typeFilter === 'adjust') rows = rows.filter(m => m.Type === 'correction' || m.Type === 'adjustment');
+  else if (typeFilter) rows = rows.filter(m => m.Type === typeFilter);
+
+  document.getElementById('journalBody').innerHTML = rows.map(m => {
+    const exists = state.products.some(p => p.ID === m.ProductId) || state.services.some(p => p.ID === m.ProductId);
+    const name = exists ? productLink(m.ProductId, m.ProductName) : escapeHtml(m.ProductName);
+    const delta = Number(m.Delta);
+    return `<tr>
+      <td>${formatDate(m.Date)}</td>
+      <td>${name}</td>
+      <td>${escapeHtml(JOURNAL_TYPE_LABELS[m.Type] || m.Type)}</td>
+      <td class="${delta < 0 ? 'out-cell' : 'in-cell'}">${delta > 0 ? '+' : ''}${delta}</td>
+      <td>${escapeHtml(m.RefLabel)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--muted);">Нет операций за период</td></tr>';
+}
+
+document.getElementById('journalShowBtn').addEventListener('click', showJournal);
+document.getElementById('journalSearch').addEventListener('input', renderJournal);
+document.getElementById('journalTypeSelect').addEventListener('change', renderJournal);
+
 // ---- Warehouse: Инвентаризации ----
 let countItems = [];
 
@@ -1411,6 +1463,8 @@ renderCountItems();
   document.getElementById('paymentsTo').value = toDateVal(now);
   document.getElementById('pnlFrom').value = toDateVal(monthAgo);
   document.getElementById('pnlTo').value = toDateVal(now);
+  document.getElementById('journalFrom').value = toDateVal(monthAgo);
+  document.getElementById('journalTo').value = toDateVal(now);
 })();
 
 // ---- Sales (продажи) ----

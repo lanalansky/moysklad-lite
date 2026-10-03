@@ -146,6 +146,7 @@ function doPost(e) {
       case 'completeOrder': result = completeOrder(payload); break;
       case 'deleteOrder': result = deleteOrder(payload); break;
       case 'getTurnover': result = getTurnover(payload); break;
+      case 'getMovementsLog': result = getMovementsLog(payload); break;
       case 'getStockAsOf': result = getStockAsOf(payload); break;
       case 'addInventory': result = addInventory(payload); break;
       case 'deleteInventory': result = deleteInventory(payload); break;
@@ -414,6 +415,24 @@ function movementsByProduct() {
     (byProduct[m.ProductId] = byProduct[m.ProductId] || []).push(m);
   });
   return byProduct;
+}
+
+// Full audit trail of every stock-affecting action (sale, purchase, repack,
+// inventory count, manual correction/adjustment) - a human-readable version
+// of the Movements sheet, scoped to a date range so it isn't pulled in full
+// on every getAll(). Not bundled into getAll because it can grow large and
+// most screens never need it.
+function getMovementsLog(payload) {
+  var dateFrom = payload.dateFrom ? new Date(payload.dateFrom) : null;
+  var dateTo = payload.dateTo ? new Date(payload.dateTo) : new Date();
+  var movements = sheetToObjects(movementsSheet(), MOVEMENTS_HEADERS).filter(function (m) {
+    var d = new Date(m.Date);
+    if (dateFrom && d < dateFrom) return false;
+    if (d > dateTo) return false;
+    return true;
+  });
+  movements.reverse();
+  return movements;
 }
 
 // repackExecute() always logs exactly two 'repack' movements back to back

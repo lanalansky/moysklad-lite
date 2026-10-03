@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MoySkladLite</title>
-<link rel="stylesheet" href="style.css?v=28">
+<link rel="stylesheet" href="style.css?v=29">
 </head>
 <body>
 <header class="topbar">
@@ -178,6 +178,7 @@
       <button class="subtab active" data-subtab="turnover">Обороты</button>
       <button class="subtab" data-subtab="inventory">Инвентаризации</button>
       <button class="subtab" data-subtab="stock">Остатки</button>
+      <button class="subtab" data-subtab="journal">Журнал</button>
     </nav>
 
     <div id="sub-turnover" class="subtab-panel active">
@@ -278,6 +279,32 @@
           <thead><tr><th>Наименование</th><th>Код</th><th>Остаток</th><th>Ед.</th><th>Закуп. цена</th><th>Сумма закупки</th><th>Цена продажи</th><th>Сумма продажи</th></tr></thead>
           <tbody id="stockBody"></tbody>
           <tfoot><tr id="stockTotals"></tr></tfoot>
+        </table>
+      </div>
+    </div>
+
+    <div id="sub-journal" class="subtab-panel">
+      <div class="filters">
+        <div class="field"><label>Период с</label><input type="date" id="journalFrom"></div>
+        <div class="field"><label>по</label><input type="date" id="journalTo"></div>
+        <div class="field"><label>Товар</label><input type="text" id="journalSearch" placeholder="название товара…"></div>
+        <div class="field">
+          <label>Тип операции</label>
+          <select id="journalTypeSelect">
+            <option value="">Все</option>
+            <option value="sale">Продажи</option>
+            <option value="purchase">Закупки</option>
+            <option value="repack">Пересорты</option>
+            <option value="inventory">Инвентаризации</option>
+            <option value="adjust">Ручные правки</option>
+          </select>
+        </div>
+        <button class="btn primary" id="journalShowBtn">Показать</button>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead><tr><th>Дата и время</th><th>Товар</th><th>Тип</th><th>Δ</th><th>Комментарий</th></tr></thead>
+          <tbody id="journalBody"></tbody>
         </table>
       </div>
     </div>
@@ -529,7 +556,8 @@
   </div>
 </div>
 
-<script src="config.js?v=28"></script>
-<script src="app.js?v=28"></script>
+<script src="config.js?v=29"></script>
+<script src="app.js?v=29"></script>
 </body>
 </html>
+

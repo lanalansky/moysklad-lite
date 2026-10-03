@@ -1785,6 +1785,28 @@ function renderPnl(data) {
 
 document.getElementById('pnlShowBtn').addEventListener('click', showPnl);
 
+// Month quick-nav: sets Период с/по to the first/last day of a month offset
+// from the current one (0 = this month, -1 = previous, +1 = next), mirroring
+// real МойСклад's "◀ Месяц ▶" period picker on Прибыли и убытки.
+let pnlMonthOffset = 0;
+
+function setPnlToMonth(offset) {
+  pnlMonthOffset = offset;
+  const now = new Date();
+  const base = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+  const first = new Date(base.getFullYear(), base.getMonth(), 1);
+  const last = new Date(base.getFullYear(), base.getMonth() + 1, 0);
+  const pad = n => String(n).padStart(2, '0');
+  const toDateVal = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  document.getElementById('pnlFrom').value = toDateVal(first);
+  document.getElementById('pnlTo').value = toDateVal(last);
+  showPnl();
+}
+
+document.getElementById('pnlCurMonthBtn').addEventListener('click', () => setPnlToMonth(0));
+document.getElementById('pnlPrevMonthBtn').addEventListener('click', () => setPnlToMonth(pnlMonthOffset - 1));
+document.getElementById('pnlNextMonthBtn').addEventListener('click', () => setPnlToMonth(pnlMonthOffset + 1));
+
 // ---- Helpers ----
 function escapeHtml(str) {
   if (str === undefined || str === null) return '';

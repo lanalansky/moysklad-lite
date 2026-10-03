@@ -416,6 +416,7 @@ main { padding: 24px; }
 }
 
 .filters .field { display: flex; flex-direction: column; gap: 5px; }
+.month-nav { display: flex; gap: 6px; }
 .filters label { font-size: 12px; color: var(--muted); }
 .filters input, .filters select {
   padding: 7px 10px;

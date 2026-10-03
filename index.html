@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MoySkladLite</title>
-<link rel="stylesheet" href="style.css?v=31">
+<link rel="stylesheet" href="style.css?v=32">
 </head>
 <body>
 <header class="topbar">
@@ -168,6 +168,11 @@
         <div class="field"><label>Период с</label><input type="date" id="pnlFrom"></div>
         <div class="field"><label>по</label><input type="date" id="pnlTo"></div>
         <button class="btn primary" id="pnlShowBtn">Найти</button>
+        <div class="month-nav">
+          <button class="btn" id="pnlPrevMonthBtn" title="Предыдущий месяц">◀</button>
+          <button class="btn" id="pnlCurMonthBtn">Текущий месяц</button>
+          <button class="btn" id="pnlNextMonthBtn" title="Следующий месяц">▶</button>
+        </div>
       </div>
       <table class="pnl-table" id="pnlTable"></table>
     </div>
@@ -557,10 +562,11 @@
   </div>
 </div>
 
-<script src="config.js?v=31"></script>
-<script src="app.js?v=31"></script>
+<script src="config.js?v=32"></script>
+<script src="app.js?v=32"></script>
 </body>
 </html>
+
 
 
 

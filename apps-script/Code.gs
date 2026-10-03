@@ -834,8 +834,12 @@ function getPnl(payload) {
   var grossProfit = revenue - cogs;
 
   var TAX_CATEGORY = 'Налоги и сборы';
+  // 'Выплата' is cash physically taken out of the till (partly already-earned
+  // rent, partly the owner's own card top-up) - a cash-flow movement, not a
+  // business expense, so it's excluded from operating costs here the same way
+  // 'Внесение' is excluded from revenue.
   var payments = sheetToObjects(paymentsSheet(), PAYMENTS_HEADERS)
-    .filter(function (p) { return p.Type === 'expense' && inRange(p.Date); });
+    .filter(function (p) { return p.Type === 'expense' && p.Category !== 'Выплата' && inRange(p.Date); });
   var byCategory = {};
   var taxes = 0;
   payments.forEach(function (p) {

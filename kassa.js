@@ -430,13 +430,30 @@ function openPay() {
   updateChange();
 }
 
+function getPayTotal() {
+  return parseFloat(document.getElementById('payTotal').textContent.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+}
+
 function updateChange() {
-  const total = parseFloat(document.getElementById('payTotal').textContent.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+  const total = getPayTotal();
   const given = Number(document.getElementById('cashInput').value) || 0;
   const change = Math.max(0, given - total);
   document.getElementById('changeRow').innerHTML = 'Сдача: <b>' + money(change) + '</b>';
 }
 document.getElementById('cashInput').addEventListener('input', updateChange);
+
+// Смешанная оплата: вводишь сумму в одном поле — вторая сама досчитывает
+// до суммы чека, чтобы не считать остаток в уме.
+document.getElementById('mixCash').addEventListener('input', () => {
+  const total = getPayTotal();
+  const cash = Number(document.getElementById('mixCash').value) || 0;
+  document.getElementById('mixCard').value = Math.max(0, total - cash).toFixed(2);
+});
+document.getElementById('mixCard').addEventListener('input', () => {
+  const total = getPayTotal();
+  const card = Number(document.getElementById('mixCard').value) || 0;
+  document.getElementById('mixCash').value = Math.max(0, total - card).toFixed(2);
+});
 
 document.getElementById('cardProviders').addEventListener('click', e => {
   const btn = e.target.closest('.provider-chip');

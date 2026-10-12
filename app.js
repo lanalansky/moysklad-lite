@@ -120,6 +120,7 @@ function setActiveAdminTab(tab) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.getElementById('tab-' + tab).classList.add('active');
   try { localStorage.setItem(ADMIN_TAB_KEY, tab); } catch (e) {}
+  refreshTotalsBar();
 }
 
 function setActiveAdminSubtab(subtab) {
@@ -131,6 +132,47 @@ function setActiveAdminSubtab(subtab) {
   btn.classList.add('active');
   panel.classList.add('active');
   try { localStorage.setItem(ADMIN_SUBTAB_KEY, subtab); } catch (e) {}
+  refreshTotalsBar();
+}
+
+// Sticky bottom bar showing totals for whichever list is currently on screen.
+// Each render function stores its own HTML under a key (one per tab/subtab);
+// render functions run once per data load rather than per tab switch, so the
+// bar's visible content is picked by key on every tab/subtab change instead
+// of being recomputed.
+const totalsBarContent = {};
+
+function setTotalsBar(key, html) {
+  totalsBarContent[key] = html;
+  refreshTotalsBar();
+}
+
+function currentTotalsBarKey() {
+  const tab = document.querySelector('.tab-btn.active')?.dataset.tab;
+  if (tab === 'products') return 'products';
+  if (tab === 'sales') return 'sales';
+  if (tab === 'warehouse') {
+    const sub = document.querySelector('.subtab.active')?.dataset.subtab;
+    if (sub === 'stock') return 'stock';
+    if (sub === 'turnover') return 'turnover';
+  }
+  return null;
+}
+
+function refreshTotalsBar() {
+  const bar = document.getElementById('totalsBar');
+  const key = currentTotalsBarKey();
+  const html = key ? totalsBarContent[key] : null;
+  if (html) {
+    bar.innerHTML = html;
+    bar.classList.add('visible');
+  } else {
+    bar.classList.remove('visible');
+  }
+}
+
+function totalsItem(label, value) {
+  return `<div class="totals-item">${escapeHtml(label)}: <b>${value}</b></div>`;
 }
 
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -402,6 +444,17 @@ function renderProducts() {
   bc.innerHTML = selectedGroupPath === null
     ? `<b>Товары и услуги</b> · ${items.length}`
     : `${escapeHtml(selectedGroupPath.split('/').join(' / '))} · <b>${items.length}</b>`;
+
+  const productItems = items.filter(p => !p.isService);
+  const qtySum = productItems.reduce((s, p) => s + (Number(p.Quantity) || 0), 0);
+  const costSum = productItems.reduce((s, p) => s + (Number(p.Quantity) || 0) * (Number(p.CostPrice) || 0), 0);
+  const saleSum = productItems.reduce((s, p) => s + (Number(p.Quantity) || 0) * (Number(p.Price) || 0), 0);
+  setTotalsBar('products',
+    totalsItem('Позиций', items.length) +
+    totalsItem('Остаток', qtySum) +
+    totalsItem('Сумма закупки', formatMoney(costSum)) +
+    totalsItem('Сумма продажи', formatMoney(saleSum))
+  );
 }
 
 function fillProductForm(p) {
@@ -1166,6 +1219,14 @@ function renderTurnoverRows(rows) {
   });
   document.getElementById('turnoverBody').innerHTML = html || '<tr><td colspan="11" style="text-align:center;color:var(--muted);">Нет данных за период</td></tr>';
   document.getElementById('turnoverTotals').innerHTML = rows.length ? `<td colspan="3">Итого</td><td>${totals.startQty}</td><td>${formatMoney(totals.startSum)}</td><td>${totals.inQty}</td><td>${formatMoney(totals.inSum)}</td><td>${totals.outQty}</td><td>${formatMoney(totals.outSum)}</td><td>${totals.endQty}</td><td>${formatMoney(totals.endSum)}</td>` : '';
+
+  setTotalsBar('turnover',
+    totalsItem('Позиций', rows.length) +
+    totalsItem('Приход', totals.inQty) +
+    totalsItem('Расход', totals.outQty) +
+    totalsItem('Остаток на конец', totals.endQty) +
+    totalsItem('Сумма на конец', formatMoney(totals.endSum))
+  );
 }
 
 document.getElementById('turnoverShowBtn').addEventListener('click', showTurnover);
@@ -1219,6 +1280,13 @@ function renderStock() {
   });
   document.getElementById('stockBody').innerHTML = html || '<tr><td colspan="8" style="text-align:center;color:var(--muted);">Нет товаров</td></tr>';
   document.getElementById('stockTotals').innerHTML = filtered.length ? `<td colspan="2">Итого (${filtered.length})</td><td>${totals.qty}</td><td></td><td></td><td>${formatMoney(totals.costSum)}</td><td></td><td>${formatMoney(totals.saleSum)}</td>` : '';
+
+  setTotalsBar('stock',
+    totalsItem('Позиций', filtered.length) +
+    totalsItem('Остаток', totals.qty) +
+    totalsItem('Сумма закупки', formatMoney(totals.costSum)) +
+    totalsItem('Сумма продажи', formatMoney(totals.saleSum))
+  );
 }
 
 document.getElementById('stockShowBtn').addEventListener('click', showStock);
@@ -1492,6 +1560,14 @@ function renderSales() {
   document.getElementById('salesTotals').innerHTML = sales.length
     ? `<td colspan="2">Итого</td><td>${formatMoney(totals.cash)}</td><td>${formatMoney(totals.card)}</td><td>${formatMoney(totals.discount)}</td><td>${formatMoney(totals.total)}</td><td colspan="2"></td>`
     : '';
+
+  setTotalsBar('sales',
+    totalsItem('Продаж', sales.length) +
+    totalsItem('Наличные', formatMoney(totals.cash)) +
+    totalsItem('Безнал', formatMoney(totals.card)) +
+    totalsItem('Скидки', formatMoney(totals.discount)) +
+    totalsItem('Итого', formatMoney(totals.total))
+  );
 }
 
 function saleMethodLabel(s) {

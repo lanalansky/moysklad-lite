@@ -58,7 +58,26 @@ body {
   font-weight: 600;
 }
 
-main { padding: 24px; }
+main { padding: 24px; padding-bottom: 68px; }
+
+.totals-bar {
+  display: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, .06);
+  padding: 12px 24px;
+  gap: 28px;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+.totals-bar.visible { display: flex; }
+.totals-bar .totals-item { font-size: 13px; color: var(--muted); display: flex; gap: 6px; align-items: baseline; }
+.totals-bar .totals-item b { font-size: 15px; color: var(--text); font-weight: 700; }
 
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }

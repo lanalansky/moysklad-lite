@@ -1929,7 +1929,16 @@ function searchProducts(items, query, limit) {
     else if (name.includes(q)) score = 4;
     if (score >= 0) scored.push({ p, score });
   });
-  scored.sort((a, b) => a.score - b.score);
+  // In-stock items always come before out-of-stock ones (services, which
+  // have no Quantity, count as always available); relevance only breaks
+  // ties within the same stock tier, so a cashier isn't scrolling past
+  // unsellable variants to find what's actually on the shelf.
+  scored.sort((a, b) => {
+    const aOut = a.p.Quantity !== undefined && Number(a.p.Quantity) <= 0 ? 1 : 0;
+    const bOut = b.p.Quantity !== undefined && Number(b.p.Quantity) <= 0 ? 1 : 0;
+    if (aOut !== bOut) return aOut - bOut;
+    return a.score - b.score;
+  });
   return scored.slice(0, limit || 20).map(x => x.p);
 }
 

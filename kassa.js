@@ -145,6 +145,13 @@ function renderCatalog(filter) {
     if (!words.length) return true;
     const haystack = [p.Name, p.Code, p.Article].filter(Boolean).join(' ').toLowerCase();
     return words.every(w => haystack.includes(w));
+  }).sort((a, b) => {
+    // In-stock items first (services have no Quantity and count as always
+    // available), so the cashier isn't scrolling past what can't be sold.
+    const aOut = a.Quantity !== undefined && Number(a.Quantity) <= 0 ? 1 : 0;
+    const bOut = b.Quantity !== undefined && Number(b.Quantity) <= 0 ? 1 : 0;
+    if (aOut !== bOut) return aOut - bOut;
+    return String(a.Name || '').localeCompare(String(b.Name || ''), 'ru');
   });
   list.innerHTML = items.map(p => {
     const isService = p.Quantity === undefined;
